@@ -1,9 +1,10 @@
 import { NextResponse } from "next/server"
-import { requireRole } from "@/lib/auth/auth-guard"
+import { requirePermission } from "@/lib/auth/permission-guard"
+import { PermissionId } from "@/lib/auth/permission-codes"
 
 export async function GET(req: Request) {
     try {
-        const user = requireRole(req, "Admin")
+        const user = await requirePermission(req, PermissionId.ADMIN_ACCESS)
 
         return NextResponse.json({
             message: "Welcome Admin",

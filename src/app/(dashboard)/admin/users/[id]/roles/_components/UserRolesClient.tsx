@@ -98,8 +98,8 @@ export function UserRolesClient({
                     <button
                         type="submit"
                         form="user-roles-form"
-                        className="inline-flex items-center gap-2 justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2"
-                        disabled={saving}
+                        className="inline-flex items-center gap-2 justify-center rounded-md text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 h-10 px-4 py-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        disabled={saving || currentUser?.sub === userId}
                     >
                         {saving ? (
                             <>
@@ -122,31 +122,44 @@ export function UserRolesClient({
                 </div>
             )}
 
-            <form id="user-roles-form" onSubmit={handleSubmit} className="space-y-6">
-                <div className="space-y-2">
-                    <label className="text-sm font-medium leading-none">Available Roles</label>
-                    <div className="border rounded-md divide-y max-h-[400px] overflow-y-auto">
-                        {allRoles.map(role => (
-                            <label
-                                key={role.id}
-                                className="flex items-center space-x-3 p-3 hover:bg-muted/50 cursor-pointer transition-colors"
-                            >
-                                <input
-                                    type="checkbox"
-                                    checked={assignedRoleIds.has(role.id)}
-                                    onChange={() => toggleRole(role.id)}
-                                    className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
-                                />
-                                <div className="flex flex-col">
-                                    <span className="text-sm font-medium">{role.name}</span>
-                                </div>
-                            </label>
-                        ))}
+            {/* Self-modification block */}
+            {currentUser?.sub === userId ? (
+                <div className="p-8 border-2 border-dashed border-red-200 rounded-lg bg-red-50 text-center space-y-4">
+                    <div className="mx-auto w-12 h-12 bg-red-100 rounded-full flex items-center justify-center text-red-600">
+                        <Save size={24} />
+                    </div>
+                    <div className="space-y-2">
+                        <h3 className="text-lg font-semibold text-red-900">Restriction: Self-Management</h3>
+                        <p className="text-sm text-red-700 max-w-sm mx-auto">
+                            For security reasons, you cannot modify your own roles. Please contact another administrator if you need to change your permissions.
+                        </p>
                     </div>
                 </div>
-
-
-            </form>
+            ) : (
+                <form id="user-roles-form" onSubmit={handleSubmit} className="space-y-6">
+                    <div className="space-y-2">
+                        <label className="text-sm font-medium leading-none">Available Roles</label>
+                        <div className="border rounded-md divide-y max-h-[400px] overflow-y-auto">
+                            {allRoles.map(role => (
+                                <label
+                                    key={role.id}
+                                    className="flex items-center space-x-3 p-3 hover:bg-muted/50 cursor-pointer transition-colors"
+                                >
+                                    <input
+                                        type="checkbox"
+                                        checked={assignedRoleIds.has(role.id)}
+                                        onChange={() => toggleRole(role.id)}
+                                        className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary"
+                                    />
+                                    <div className="flex flex-col">
+                                        <span className="text-sm font-medium">{role.name}</span>
+                                    </div>
+                                </label>
+                            ))}
+                        </div>
+                    </div>
+                </form>
+            )}
         </div>
     )
 }

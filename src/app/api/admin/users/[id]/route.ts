@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePermission } from "@/lib/auth/permission-guard"
+import { PermissionId } from "@/lib/auth/permission-codes"
 
 export async function GET(
     req: Request,
@@ -9,7 +10,7 @@ export async function GET(
     console.log('[USER_DETAIL_API] Starting GET request')
     try {
         console.log('[USER_DETAIL_API] Checking permissions')
-        const currentUser = await requirePermission(req, "USER_VIEW")
+        const currentUser = await requirePermission(req, PermissionId.USER_VIEW)
         const { id } = await params
         const userId = parseInt(id)
 

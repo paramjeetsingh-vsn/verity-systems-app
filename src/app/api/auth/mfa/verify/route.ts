@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import bcrypt from "bcrypt";
 import { verifyMFA } from "@/lib/auth/mfa";
 import { signJwt, verifyJwt } from "@/lib/auth/jwt";
 import { generateRefreshToken } from "@/lib/auth/refresh-token";
@@ -85,10 +86,6 @@ export async function POST(req: Request) {
                 where: { userId: user.id, used: false }
             });
 
-            // We need 'compare' from bcrypt or similar.
-            // Let's import 'bcrypt' (it was in package.json).
-            const bcrypt = require('bcrypt');
-
             for (const backup of unusedCodes) {
                 const isMatch = await bcrypt.compare(code, backup.codeHash);
                 if (isMatch) {
@@ -110,8 +107,9 @@ export async function POST(req: Request) {
         // --- SUCCESS: Issue Real Tokens ---
 
         // 1. Roles & Permissions
-        const roles = user.userRoles.map((ur) => ur.role.name); // Check role name property
-        const permissions = await getUserPermissions(userId, user.tenantId);
+        const roles = user.userRoles.map((ur) => ur.role.name);
+        const roleIds = user.userRoles.map((ur) => ur.role.id);
+        const { ids: permissionIds, codes: permissions } = await getUserPermissions(userId, user.tenantId);
 
         // 2. Access Token (with AMR claim)
         const accessToken = signJwt(
@@ -120,7 +118,9 @@ export async function POST(req: Request) {
                 tenantId: user.tenantId,
                 email: user.email,
                 roles,
+                roleIds,
                 permissions,
+                permissionIds,
                 amr: ["pwd", "mfa"], // Authentication Method Reference
                 mfaEnabled: true
             },
@@ -154,7 +154,9 @@ export async function POST(req: Request) {
                 fullName: user.fullName,
                 email: user.email,
                 roles,
+                roleIds,
                 permissions,
+                permissionIds,
                 mfaEnabled: true
             }
         });

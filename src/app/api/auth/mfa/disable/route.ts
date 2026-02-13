@@ -7,7 +7,7 @@ import { createAuditLog } from "@/lib/audit";
 
 export async function POST(req: Request) {
     try {
-        const userPayload = requireAuth(req);
+        const userPayload = await requireAuth(req);
         const { password, mfaCode } = await req.json();
 
         if (!password || !mfaCode) {

@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
 import { requirePermission } from "@/lib/auth/permission-guard"
+import { PermissionId } from "@/lib/auth/permission-codes"
+import { prisma } from "@/lib/prisma"
 
 export async function GET(req: Request) {
     try {
-        await requirePermission(req, "PERMISSION_VIEW")
+        await requirePermission(req, PermissionId.PERMISSION_VIEW)
 
         const permissions = await prisma.permission.findMany({
             orderBy: { code: "asc" }

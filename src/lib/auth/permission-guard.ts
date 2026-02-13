@@ -3,12 +3,16 @@ import { getUserPermissions } from "./permission"
 
 export async function requirePermission(
     req: Request,
-    permission: string
+    permission: string | number
 ) {
-    const user = requireAuth(req)
-    const permissions = await getUserPermissions(user.sub, user.tenantId)
+    const user = await requireAuth(req)
+    const { ids, codes } = await getUserPermissions(user.sub, user.tenantId)
 
-    if (!permissions.includes(permission)) {
+    const hasPermission = typeof permission === 'number'
+        ? ids.includes(permission)
+        : codes.includes(permission)
+
+    if (!hasPermission) {
         throw new Response(
             JSON.stringify({ message: "Forbidden" }),
             { status: 403 }

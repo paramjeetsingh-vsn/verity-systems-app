@@ -10,7 +10,7 @@ import { createAuditLog } from "@/lib/audit";
 export async function POST(req: Request) {
     try {
         // Rebuild trigger
-        const user = requireAuth(req);
+        const user = await requireAuth(req);
         const { secret, code } = await req.json();
 
         if (!secret || !code) {

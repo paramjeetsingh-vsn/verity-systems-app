@@ -6,7 +6,7 @@ import QRCode from "qrcode";
 
 export async function POST(req: Request) {
     try {
-        const user = requireAuth(req);
+        const user = await requireAuth(req);
 
         // Generate new secret
         const secret = authenticator.generateSecret();

@@ -1,29 +1,31 @@
+import { PermissionId } from "@/lib/auth/permission-codes";
+
 export interface PrivilegedArea {
     path: string;
-    requiredRoles?: string[];
-    requiredPermissions?: string[];
+    requiredRoles?: (string | number)[];
+    requiredPermissions?: number[];
     alertCode: string;
 }
 
 export const PRIVILEGED_AREAS: Record<string, PrivilegedArea> = {
     ADMIN: {
         path: '/admin',
-        requiredRoles: ['Admin'],
+        requiredPermissions: [PermissionId.ADMIN_ACCESS, 'ADMIN_ACCESS' as any],
         alertCode: 'UNAUTHORIZED_ADMIN_ACCESS_ATTEMPT',
     },
     BILLING: {
         path: '/billing',
-        requiredPermissions: ['billing:read'],
+        requiredPermissions: [13, 'billing:read' as any],
         alertCode: 'UNAUTHORIZED_BILLING_ACCESS_ATTEMPT',
     },
     COMPLIANCE: {
         path: '/compliance',
-        requiredPermissions: ['compliance:read'],
+        requiredPermissions: [14, 'compliance:read' as any],
         alertCode: 'UNAUTHORIZED_COMPLIANCE_ACCESS_ATTEMPT',
     },
     EXPORTS: {
         path: '/exports',
-        requiredPermissions: ['data:export'],
+        requiredPermissions: [15, 'data:export' as any],
         alertCode: 'UNAUTHORIZED_EXPORT_ACCESS_ATTEMPT',
     },
 };

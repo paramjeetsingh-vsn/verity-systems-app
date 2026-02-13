@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePermission } from "@/lib/auth/permission-guard"
+import { PermissionId } from "@/lib/auth/permission-codes"
 import { createAuditLog } from "@/lib/audit"
 import crypto from "crypto"
 
 export async function GET(req: Request) {
     try {
-        const currentUser = await requirePermission(req, "USER_VIEW")
+        const currentUser = await requirePermission(req, PermissionId.USER_VIEW)
 
         const { searchParams } = new URL(req.url)
         const page = parseInt(searchParams.get("page") || "1")
@@ -65,7 +66,7 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
     try {
         // 1. Require admin authentication
-        const admin = await requirePermission(req, "USER_CREATE")
+        const admin = await requirePermission(req, PermissionId.USER_CREATE)
 
         // 2. Parse request body
         const { email, fullName, roleIds } = await req.json()

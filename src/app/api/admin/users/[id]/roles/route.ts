@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePermission } from "@/lib/auth/permission-guard"
+import { PermissionId } from "@/lib/auth/permission-codes"
 import { requireAuth } from "@/lib/auth/auth-guard"
 
 export async function GET(
@@ -8,8 +9,7 @@ export async function GET(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const user = requireAuth(req)
-        await requirePermission(req, "ROLE_VIEW")
+        const admin = await requirePermission(req, PermissionId.ROLE_ASSIGN)
 
         const { id } = await params
         const userId = Number(id)
@@ -25,7 +25,7 @@ export async function GET(
         const targetUser = await prisma.user.findFirst({
             where: {
                 id: userId,
-                tenantId: user.tenantId
+                tenantId: admin.tenantId
             }
         })
 
@@ -39,21 +39,19 @@ export async function GET(
         const userRoles = await prisma.userRole.findMany({
             where: {
                 userId,
-                user: { tenantId: user.tenantId }  // Explicit tenant scoping
+                user: { tenantId: admin.tenantId }
             },
             include: { role: true }
         })
 
-        return NextResponse.json(userRoles.map(ur => ({
-            id: ur.role.id,
-            name: ur.role.name
-        })))
-
-    } catch (error) {
-        if (error instanceof Response) return error
+        return NextResponse.json({
+            roles: userRoles.map(ur => ur.role)
+        })
+    } catch (err: any) {
+        if (err instanceof Response) return err
         return NextResponse.json(
-            { message: error instanceof Error ? error.message : "Internal Server Error" },
-            { status: 500 }
+            { message: err.message || "Internal Server Error" },
+            { status: err.status || 500 }
         )
     }
 }
@@ -63,8 +61,8 @@ export async function PUT(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        const admin = requireAuth(req)
-        await requirePermission(req, "ROLE_ASSIGN")
+        const admin = await requireAuth(req)
+        await requirePermission(req, PermissionId.ROLE_ASSIGN)
 
         const { id } = await params
         const userId = Number(id)
@@ -112,7 +110,7 @@ export async function PUT(
             prisma.userRole.deleteMany({
                 where: {
                     userId,
-                    user: { tenantId: admin.tenantId }  // Explicit tenant scoping
+                    user: { tenantId: admin.tenantId }
                 }
             }),
             prisma.userRole.createMany({
@@ -124,11 +122,11 @@ export async function PUT(
         ])
 
         return NextResponse.json({ message: "Roles updated" })
-    } catch (error) {
-        if (error instanceof Response) return error
+    } catch (err: any) {
+        if (err instanceof Response) return err
         return NextResponse.json(
-            { message: error instanceof Error ? error.message : "Internal Server Error" },
-            { status: 500 }
+            { message: err.message || "Internal Server Error" },
+            { status: err.status || 500 }
         )
     }
 }

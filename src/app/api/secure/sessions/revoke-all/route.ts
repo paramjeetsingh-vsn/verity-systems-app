@@ -5,7 +5,7 @@ import { createAuditLog } from "@/lib/audit";
 
 export async function POST(req: Request) {
     try {
-        const payload = requireAuth(req);
+        const payload = await requireAuth(req);
         const userId = payload.sub;
         const tenantId = payload.tenantId;
         const ip = req.headers.get("x-forwarded-for") || "unknown";

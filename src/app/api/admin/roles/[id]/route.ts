@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma"
-import { requireAuth } from "@/lib/auth/auth-guard"
 import { requirePermission } from "@/lib/auth/permission-guard"
+import { requireAuth } from "@/lib/auth/auth-guard"
+import { PermissionId } from "@/lib/auth/permission-codes"
 import { NextResponse } from "next/server"
 
 // ... imports
@@ -10,7 +11,7 @@ export async function GET(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        await requirePermission(req, "ROLE_VIEW")
+        const user = await requirePermission(req, PermissionId.ROLE_VIEW)
 
         const { id } = await params
         const role = await prisma.role.findUnique({
@@ -46,7 +47,7 @@ export async function PUT(
     { params }: { params: Promise<{ id: string }> }
 ) {
     try {
-        requireAuth(req)
+        await requireAuth(req)
         await requirePermission(req, "ROLE_CREATE") // Re-use create permission or update if distinct
 
         const { name, permissionIds } = await req.json()

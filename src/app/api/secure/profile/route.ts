@@ -5,7 +5,7 @@ import { getUserPermissions } from "@/lib/auth/permission"
 
 export async function GET(req: Request) {
   try {
-    const payload = requireAuth(req)
+    const payload = await requireAuth(req)
 
     const user = await prisma.user.findUnique({
       where: { id: payload.sub, tenantId: payload.tenantId },
@@ -21,7 +21,8 @@ export async function GET(req: Request) {
     }
 
     const roles = user.userRoles.map((ur) => ur.role.name)
-    const permissions = await getUserPermissions(user.id, user.tenantId)
+    const roleIds = user.userRoles.map((ur) => ur.role.id)
+    const { ids: permissionIds, codes: permissions } = await getUserPermissions(user.id, user.tenantId)
 
     return NextResponse.json({
       message: "You are authenticated",
@@ -30,7 +31,9 @@ export async function GET(req: Request) {
         fullName: user.fullName,
         email: user.email,
         roles,
+        roleIds,
         permissions,
+        permissionIds,
         mfaEnabled: user.mfaEnabled
       }
     })

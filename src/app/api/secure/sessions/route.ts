@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 
 export async function GET(req: Request) {
     try {
-        const payload = requireAuth(req);
+        const payload = await requireAuth(req);
         const userId = payload.sub;
         const currentSid = payload.sid; // Read SID from token
 

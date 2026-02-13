@@ -1,12 +1,13 @@
 import { NextResponse } from "next/server"
 import { prisma } from "@/lib/prisma"
 import { requirePermission } from "@/lib/auth/permission-guard"
+import { PermissionId } from "@/lib/auth/permission-codes"
 
 export async function GET(req: Request) {
     try {
         // Require permission to view security audit data
-        const admin = await requirePermission(req, "AUDIT_VIEW")
-        const tenantId = admin.tenantId
+        const currentUser = await requirePermission(req, PermissionId.AUDIT_VIEW)
+        const tenantId = currentUser.tenantId
 
         // Time window for recent events (24 hours)
         const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)

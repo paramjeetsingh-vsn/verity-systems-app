@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react"
 import { useAuth } from "@/lib/auth/auth-context"
+import { useRouter } from "next/navigation"
 import { Users, Shield, Lock, Activity, Clock, LogOut } from "lucide-react"
 
 // Types matching the API implementation
@@ -44,6 +45,7 @@ type DashboardData = {
 }
 
 export default function AdminDashboardPage() {
+    const router = useRouter()
     const { fetchWithAuth } = useAuth()
     const [loading, setLoading] = useState(true)
     const [stats, setStats] = useState<DashboardData | null>(null)
@@ -52,9 +54,10 @@ export default function AdminDashboardPage() {
         const loadDashboardData = async () => {
             try {
                 // Fetch data in parallel
-                const [users, auditEvents] = await Promise.all([
+                const [users, auditEvents, sessionData] = await Promise.all([
                     fetchWithAuth<User[]>("/api/admin/users"),
-                    fetchWithAuth<{ events: AuditEvent[], total: number }>("/api/admin/audit-events?limit=50")
+                    fetchWithAuth<{ events: AuditEvent[], total: number }>("/api/admin/audit-events?limit=50"),
+                    fetchWithAuth<{ sessions: any[] }>("/api/admin/sessions")
                 ])
 
                 // 1. Calculate User Stats
@@ -70,13 +73,10 @@ export default function AdminDashboardPage() {
                     pending: 0 // Placeholder until status enum exposed or derived
                 }
 
-                // 2. Calculate Session Stats (Proxy)
-                // We don't have a direct "Active Sessions" API.
-                // Proxy: Count users who logged in within last 24h as "Active today"
+                // 2. Session Stats
+                const activeSessions = sessionData.sessions.length;
+
                 const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000)
-                const activeSessions = users.filter(u =>
-                    u.lastLoginAt && new Date(u.lastLoginAt) > oneDayAgo
-                ).length
 
                 // For revoked sessions, we check audit logs for REVOKE events
                 const revokedSessions = auditEvents.events.filter(e =>
@@ -148,7 +148,10 @@ export default function AdminDashboardPage() {
                     </div>
                 </Card>
 
-                <Card>
+                <Card
+                    className="cursor-pointer hover:bg-muted/10 transition-colors"
+                    onClick={() => router.push("/admin/sessions")}
+                >
                     <div className="flex flex-row items-center justify-between space-y-0 pb-2 p-6">
                         <div className="text-sm font-medium">Active Sessions</div>
                         <Activity className="h-4 w-4 text-muted-foreground" />
@@ -156,7 +159,7 @@ export default function AdminDashboardPage() {
                     <div className="p-6 pt-0">
                         <div className="text-2xl font-bold">{stats?.sessions.active}</div>
                         <p className="text-xs text-muted-foreground">
-                            Users logged in (last 24h)
+                            Global active sessions right now
                         </p>
                     </div>
                 </Card>
@@ -234,9 +237,12 @@ export default function AdminDashboardPage() {
 }
 
 // Simple Card Component for Layout
-function Card({ children }: { children: React.ReactNode }) {
+function Card({ children, className = "", onClick }: { children: React.ReactNode, className?: string, onClick?: () => void }) {
     return (
-        <div className="rounded-xl bg-card text-card-foreground">
+        <div
+            className={`rounded-xl bg-card text-card-foreground ${className}`}
+            onClick={onClick}
+        >
             {children}
         </div>
     )

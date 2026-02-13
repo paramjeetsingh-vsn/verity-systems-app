@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server"
 import { requirePermission } from "@/lib/auth/permission-guard"
+import { PermissionId } from "@/lib/auth/permission-codes"
 import { prisma } from "@/lib/prisma"
 
 export async function GET(req: Request) {
     try {
-        const currentUser = await requirePermission(req, "AUDIT_VIEW")
+        const user = await requirePermission(req, PermissionId.AUDIT_VIEW)
 
         const { searchParams } = new URL(req.url)
         const page = parseInt(searchParams.get("page") || "1")
@@ -16,7 +17,7 @@ export async function GET(req: Request) {
 
         // Build where clause
         const where: any = {
-            tenantId: currentUser.tenantId
+            tenantId: user.tenantId
         }
 
         if (action) {

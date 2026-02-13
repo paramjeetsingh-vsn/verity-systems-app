@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server"
-import { prisma } from "@/lib/prisma"
 import { requirePermission } from "@/lib/auth/permission-guard"
+import { PermissionId } from "@/lib/auth/permission-codes"
+import { prisma } from "@/lib/prisma"
 
 export async function GET(req: Request) {
     try {
-        const admin = await requirePermission(req, "AUDIT_VIEW")
+        const admin = await requirePermission(req, PermissionId.AUDIT_VIEW)
         const tenantId = admin.tenantId
 
         const { searchParams } = new URL(req.url)

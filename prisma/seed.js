@@ -22,24 +22,24 @@ async function main() {
     // 2. Create Permissions
     console.log('Creating permissions...')
     const permissions = [
-        { code: 'USER_VIEW', description: 'View users' },
-        { code: 'USER_CREATE', description: 'Create users' },
-        { code: 'USER_UPDATE', description: 'Update users' },
-        { code: 'USER_DELETE', description: 'Delete users' },
-        { code: 'ROLE_VIEW', description: 'View roles' },
-        { code: 'ROLE_CREATE', description: 'Create roles' },
-        { code: 'ROLE_UPDATE', description: 'Update roles' },
-        { code: 'ROLE_DELETE', description: 'Delete roles' },
-        { code: 'ROLE_ASSIGN', description: 'Assign roles to users' },
-        { code: 'PERMISSION_VIEW', description: 'View permissions' },
-        { code: 'AUDIT_VIEW', description: 'View audit logs' },
-        { code: 'ADMIN_ACCESS', description: 'Access admin panel' },
+        { id: 1, code: 'USER_VIEW', description: 'View users' },
+        { id: 2, code: 'USER_CREATE', description: 'Create users' },
+        { id: 3, code: 'USER_UPDATE', description: 'Update users' },
+        { id: 4, code: 'USER_DELETE', description: 'Delete users' },
+        { id: 5, code: 'ROLE_VIEW', description: 'View roles' },
+        { id: 6, code: 'ROLE_CREATE', description: 'Create roles' },
+        { id: 7, code: 'ROLE_UPDATE', description: 'Update roles' },
+        { id: 8, code: 'ROLE_DELETE', description: 'Delete roles' },
+        { id: 9, code: 'ROLE_ASSIGN', description: 'Assign roles to users' },
+        { id: 10, code: 'PERMISSION_VIEW', description: 'View permissions' },
+        { id: 11, code: 'AUDIT_VIEW', description: 'View audit logs' },
+        { id: 12, code: 'ADMIN_ACCESS', description: 'Access admin panel' },
     ]
 
     for (const perm of permissions) {
         await prisma.permission.upsert({
-            where: { code: perm.code },
-            update: {},
+            where: { id: perm.id },
+            update: { code: perm.code, description: perm.description },
             create: perm,
         })
     }
@@ -48,14 +48,10 @@ async function main() {
     // 3. Create Admin Role
     console.log('Creating admin role...')
     const adminRole = await prisma.role.upsert({
-        where: {
-            tenantId_name: {
-                tenantId: tenant.id,
-                name: 'Admin',
-            },
-        },
-        update: {},
+        where: { id: 1 },
+        update: { name: 'Admin', tenantId: tenant.id },
         create: {
+            id: 1,
             tenantId: tenant.id,
             name: 'Admin',
             description: 'Full system administrator',
@@ -132,14 +128,10 @@ async function main() {
     // 7. Create User Role (for regular users)
     console.log('Creating user role...')
     const userRole = await prisma.role.upsert({
-        where: {
-            tenantId_name: {
-                tenantId: tenant.id,
-                name: 'User',
-            },
-        },
-        update: {},
+        where: { id: 2 },
+        update: { name: 'User', tenantId: tenant.id },
         create: {
+            id: 2,
             tenantId: tenant.id,
             name: 'User',
             description: 'Standard user',

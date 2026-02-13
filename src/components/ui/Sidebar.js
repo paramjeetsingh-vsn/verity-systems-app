@@ -15,23 +15,26 @@ import {
     Shield,
     Lock,
     X,
+    Activity,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { useAuth } from "@/lib/auth/auth-context";
+import { PermissionId } from "@/lib/auth/permission-codes";
 
 const navItems = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard },
     {
         name: "Admin",
         icon: Shield,
-        permission: "ADMIN_ACCESS",
+        permission: PermissionId.ADMIN_ACCESS,
         children: [
-            { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard, permission: "USER_VIEW" },
-            { name: "Security", href: "/admin/security", icon: Shield, permission: "AUDIT_VIEW" },
-            { name: "Users", href: "/admin/users", icon: Users, permission: "USER_VIEW" },
-            { name: "Roles", href: "/admin/roles", icon: Shield, permission: "ROLE_VIEW" },
-            { name: "Permissions", href: "/admin/permissions", icon: Lock, permission: "PERMISSION_VIEW" },
-            { name: "Audit Log", href: "/admin/audit", icon: FileText, permission: "AUDIT_VIEW" },
+            { name: "Dashboard", href: "/admin/dashboard", icon: LayoutDashboard, permission: PermissionId.USER_VIEW },
+            { name: "Security", href: "/admin/security", icon: Shield, permission: PermissionId.AUDIT_VIEW },
+            { name: "Users", href: "/admin/users", icon: Users, permission: PermissionId.USER_VIEW },
+            { name: "Roles", href: "/admin/roles", icon: Shield, permission: PermissionId.ROLE_VIEW },
+            { name: "Sessions", href: "/admin/sessions", icon: Activity, permission: PermissionId.AUDIT_VIEW },
+            { name: "Permissions", href: "/admin/permissions", icon: Lock, permission: PermissionId.PERMISSION_VIEW },
+            { name: "Audit Log", href: "/admin/audit", icon: FileText, permission: PermissionId.AUDIT_VIEW },
         ]
     },
     { name: "Reports", href: "/reports", icon: FileText },
@@ -143,8 +146,15 @@ export function Sidebar({ mobileOpen, setMobileOpen }) {
 
     const getVisibleItems = (items) => {
         return items.reduce((acc, item) => {
-            if (item.permission && !user?.permissions?.includes(item.permission)) {
-                return acc;
+            if (item.permission) {
+                const hasIdPermission = typeof item.permission === 'number' &&
+                    (user?.permissionIds?.includes(item.permission) || user?.permissionIds?.includes(String(item.permission)));
+                const hasCodePermission = typeof item.permission === 'string' &&
+                    (user?.permissions?.includes(item.permission) || (user?.permissionIds && user.permissionIds.includes(parseInt(item.permission))));
+
+                if (!hasIdPermission && !hasCodePermission) {
+                    return acc;
+                }
             }
 
             if (item.children) {

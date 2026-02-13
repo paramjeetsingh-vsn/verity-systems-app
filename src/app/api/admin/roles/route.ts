@@ -2,11 +2,12 @@ import { NextResponse } from "next/server"
 // Force rebuild
 import { requirePermission } from "@/lib/auth/permission-guard"
 import { requireAuth } from "@/lib/auth/auth-guard"
+import { PermissionId } from "@/lib/auth/permission-codes"
 import { prisma } from "@/lib/prisma"
 
 export async function GET(req: Request) {
     try {
-        const currentUser = await requirePermission(req, "ROLE_VIEW")
+        const currentUser = await requirePermission(req, PermissionId.ROLE_VIEW)
 
         const roles = await prisma.role.findMany({
             where: {
@@ -54,8 +55,8 @@ export async function GET(req: Request) {
 export async function POST(req: Request) {
     try {
         // We need the user to set tenantId
-        const user = requireAuth(req)
-        await requirePermission(req, "ROLE_CREATE")
+        const user = await requireAuth(req)
+        await requirePermission(req, PermissionId.ROLE_CREATE)
 
         const { name, permissionIds } = await req.json()
 

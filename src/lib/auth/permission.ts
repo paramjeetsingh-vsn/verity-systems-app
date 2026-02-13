@@ -17,13 +17,16 @@ export async function getUserPermissions(userId: number, tenantId: number) {
         }
     })
 
-    return Array.from(
-        new Set(
-            roles.flatMap(r =>
-                r.role.rolePermissions.map(
-                    rp => rp.permission.code
-                )
-            )
-        )
-    )
+    const permissionMap = new Map<number, string>()
+
+    roles.forEach(r => {
+        r.role.rolePermissions.forEach(rp => {
+            permissionMap.set(rp.permission.id, rp.permission.code)
+        })
+    })
+
+    return {
+        ids: Array.from(permissionMap.keys()),
+        codes: Array.from(permissionMap.values())
+    }
 }

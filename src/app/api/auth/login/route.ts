@@ -129,9 +129,10 @@ export async function POST(req: Request) {
 
         // 4️⃣ Build roles
         const roles = user.userRoles.map((ur) => ur.role.name)
+        const roleIds = user.userRoles.map((ur) => ur.role.id)
 
         // 4.5️⃣ Fetch permissions
-        const permissions = await getUserPermissions(user.id, user.tenantId)
+        const { ids: permissionIds, codes: permissions } = await getUserPermissions(user.id, user.tenantId)
 
         // 7️⃣ Create refresh token
         const { token: refreshToken, hash } = generateRefreshToken()
@@ -157,7 +158,9 @@ export async function POST(req: Request) {
                 tenantId: user.tenantId,
                 email: user.email,
                 roles,
+                roleIds,
                 permissions,
+                permissionIds,
                 mfaEnabled: user.mfaEnabled,
                 sid: newRefreshTokenRecord.id // Session ID
             },
@@ -174,7 +177,9 @@ export async function POST(req: Request) {
                 fullName: user.fullName,
                 email: user.email,
                 roles,
+                roleIds,
                 permissions,
+                permissionIds,
                 mfaEnabled: user.mfaEnabled
             }
         })

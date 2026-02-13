@@ -1,14 +1,8 @@
 import { verifyJwt } from "./jwt"
 import { NextResponse } from "next/server"
-
-export type AuthUser = {
-    sub: number        // userId
-    tenantId: number
-    email: string
-    roles: string[]
-    permissions?: string[]
-    sid?: number
-}
+import { AuthUser } from "./auth-types"
+export type { AuthUser } from "./auth-types"
+import { prisma } from "@/lib/prisma"
 
 /**
  * requireAuth
@@ -21,7 +15,7 @@ export type AuthUser = {
  * Any database access AFTER this point
  * MUST include tenantId explicitly.
  */
-export function requireAuth(req: Request): AuthUser {
+export async function requireAuth(req: Request): Promise<AuthUser> {
     const authHeader = req.headers.get("authorization")
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -52,21 +46,40 @@ export function requireAuth(req: Request): AuthUser {
         )
     }
 
+    // ⚡ Session Validation (Instant Revocation)
+    if (user.sid) {
+        const session = await prisma.refreshToken.findUnique({
+            where: { id: user.sid },
+            select: { revokedAt: true }
+        });
+
+        if (!session || session.revokedAt) {
+            throw NextResponse.json(
+                { message: "Session revoked or invalid" },
+                { status: 401 }
+            );
+        }
+    }
+
     return user
 }
 
-export function requireRole(req: Request, role: string): AuthUser {
-    const user = requireAuth(req)
+export async function requireRole(req: Request, role: string | number): Promise<AuthUser> {
+    const user = await requireAuth(req)
 
-    if (!user.roles?.includes(role)) {
+    const hasRole = typeof role === 'number'
+        ? user.roleIds?.includes(role)
+        : user.roles.includes(role)
+
+    if (!hasRole) {
         throw NextResponse.json({ message: "Forbidden" }, { status: 403 })
     }
 
     return user
 }
 
-export function requirePermission(req: Request, permission: string): AuthUser {
-    const user = requireAuth(req)
+export async function requirePermission(req: Request, permission: string): Promise<AuthUser> {
+    const user = await requireAuth(req)
 
     if (!user.permissions || !user.permissions.includes(permission)) {
         throw NextResponse.json({ message: "Forbidden" }, { status: 403 })

@@ -14,7 +14,7 @@ export async function POST(
     { params }: { params: Promise<{ id: string }> } // params is now a Promise in Next.js 15+
 ) {
     try {
-        const userPayload = requireAuth(req);
+        const userPayload = await requireAuth(req);
         const adminId = userPayload.sub;
         const tenantId = userPayload.tenantId;
         const { id: targetUserIdStr } = await params;
@@ -31,7 +31,7 @@ export async function POST(
         const permissions = await getUserPermissions(adminId, tenantId);
 
         // TODO: Replace with your actual permission constant
-        const CAN_MANAGE_USERS = permissions.includes("users.manage");
+        const CAN_MANAGE_USERS = permissions.codes.includes("users.manage");
 
         // Fallback: Check if admin has 'Admin' role if permissions aren't fully set up
         const adminUser = await prisma.user.findUnique({

@@ -23,9 +23,9 @@ export interface TenantContext {
  * @returns Validated tenant context
  * @throws Error if tenant context is missing or invalid
  */
-export function requireTenantContext(req: Request): TenantContext {
+export async function requireTenantContext(req: Request): Promise<TenantContext> {
     // Get authenticated user
-    const user = requireAuth(req)
+    const user = await requireAuth(req)
 
     // Validate tenantId exists and is valid
     if (!user.tenantId || user.tenantId <= 0) {

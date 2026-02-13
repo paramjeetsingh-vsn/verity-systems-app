@@ -67,7 +67,7 @@ function EventDetailModal({ isOpen, onClose, event }: EventDetailModalProps) {
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
             <div className="bg-card rounded-lg shadow-lg max-w-2xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-                <div className="p-6 border-b border-border flex items-center justify-between">
+                <div className="p-6 border-2 border-background flex items-center justify-between">
                     <h2 className="text-xl font-semibold">Audit Event Details</h2>
                     <button
                         onClick={onClose}
@@ -248,8 +248,8 @@ export default function AuditViewerPage() {
                 <button
                     onClick={() => setShowFilters(!showFilters)}
                     className={`inline-flex items-center gap-2 px-4 py-2 rounded-md border transition-colors ${hasActiveFilters
-                            ? "border-primary bg-primary/10 text-primary"
-                            : "border-border hover:bg-muted"
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "border-border hover:bg-muted"
                         }`}
                 >
                     <Filter className="h-4 w-4" />
@@ -366,7 +366,7 @@ export default function AuditViewerPage() {
                     <div className="hidden lg:block rounded-lg bg-card shadow-sm overflow-hidden">
                         <div className="overflow-x-auto">
                             <table className="w-full text-sm">
-                                <thead className="border-b">
+                                <thead className="border-2 border-background">
                                     <tr className="bg-muted/50">
                                         <th className="h-12 px-4 text-left font-medium text-muted-foreground">Timestamp</th>
                                         <th className="h-12 px-4 text-left font-medium text-muted-foreground">Action</th>
@@ -381,7 +381,7 @@ export default function AuditViewerPage() {
                                         <tr
                                             key={event.id}
                                             onClick={() => setSelectedEvent(event)}
-                                            className="border-b hover:bg-muted/50 cursor-pointer transition-colors"
+                                            className="border-2 border-background hover:bg-muted/50 cursor-pointer transition-colors"
                                         >
                                             <td className="p-4 whitespace-nowrap">{formatDate(event.createdAt)}</td>
                                             <td className="p-4">

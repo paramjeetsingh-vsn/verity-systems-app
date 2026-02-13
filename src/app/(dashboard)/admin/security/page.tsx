@@ -172,13 +172,13 @@ export default function SecurityDashboard() {
 
             {/* Alerts Table */}
             <div className="rounded-lg bg-card shadow-sm">
-                <div className="p-6 border-b-2 border-background">
+                <div className="p-6 border-2 border-background">
                     <h3 className="font-semibold">Recent Security Alerts</h3>
                 </div>
                 <div className="relative w-full overflow-auto">
                     <table className="w-full caption-bottom text-sm text-left">
-                        <thead className="[&_tr]:border-b-2 border-background">
-                            <tr className="border-b-2 border-background transition-colors hover:bg-muted/50">
+                        <thead className="[&_tr]:border-2 border-background">
+                            <tr className="border-2 border-background transition-colors hover:bg-muted/50">
                                 <th className="h-10 px-4 align-middle font-medium text-muted-foreground">
                                     Severity
                                 </th>
@@ -211,7 +211,7 @@ export default function SecurityDashboard() {
                                     <tr
                                         key={alert.id}
                                         onClick={() => setSelectedAlert(alert)}
-                                        className="border-b transition-colors hover:bg-muted/50 cursor-pointer"
+                                        className="border-2 border-background transition-colors hover:bg-muted/50 cursor-pointer"
                                     >
                                         <td className="p-4 align-middle">
                                             <Badge severity={alert.severity} />
@@ -242,7 +242,7 @@ export default function SecurityDashboard() {
             {selectedAlert && (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
                     <div className="bg-background border rounded-lg shadow-lg w-full max-w-lg overflow-hidden animate-in fade-in zoom-in-95 duration-200">
-                        <div className="p-6 border-b flex items-start justify-between">
+                        <div className="p-6 border-2 border-background flex items-start justify-between">
                             <div>
                                 <h2 className="text-lg font-semibold flex items-center gap-2">
                                     <Badge severity={selectedAlert.severity} />

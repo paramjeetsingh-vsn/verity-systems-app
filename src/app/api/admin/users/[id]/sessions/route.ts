@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { requirePermission } from "@/lib/auth/permission-guard";
+import { PermissionId } from "@/lib/auth/permission-codes";
 
 export async function GET(
     req: Request,
@@ -8,9 +9,9 @@ export async function GET(
 ) {
     try {
 
-        const currentUser = await requirePermission(req, "USER_VIEW");
-        const adminId = currentUser.sub;
-        const tenantId = currentUser.tenantId;
+        const admin = await requirePermission(req, PermissionId.USER_VIEW);
+        const adminId = admin.sub;
+        const tenantId = admin.tenantId;
 
         const { id: targetUserIdStr } = await params;
         const targetUserId = parseInt(targetUserIdStr);

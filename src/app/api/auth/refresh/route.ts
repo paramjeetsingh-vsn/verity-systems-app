@@ -85,6 +85,8 @@ export async function POST(req: Request) {
     })
 
     const roles = record.user.userRoles.map((ur) => ur.role.name)
+    const roleIds = record.user.userRoles.map((ur) => ur.role.id)
+    const { ids: permissionIds, codes: permissions } = await getUserPermissions(record.user.id, record.user.tenantId)
 
     // 🔁 New access token
     const payload: any = {
@@ -92,6 +94,9 @@ export async function POST(req: Request) {
         tenantId: record.user.tenantId,
         email: record.user.email,
         roles,
+        roleIds,
+        permissions,
+        permissionIds,
         mfaEnabled: record.user.mfaEnabled,
         sid: newRecord.id // Session ID
     };
@@ -107,8 +112,6 @@ export async function POST(req: Request) {
         { expiresIn: ACCESS_TOKEN_EXP }
     )
 
-    const permissions = await getUserPermissions(record.user.id, record.user.tenantId)
-
     // 🔁 Response
     const response = NextResponse.json({
         accessToken: newAccessToken,
@@ -119,7 +122,9 @@ export async function POST(req: Request) {
             fullName: record.user.fullName,
             email: record.user.email,
             roles,
+            roleIds,
             permissions,
+            permissionIds,
             mfaEnabled: record.user.mfaEnabled
         }
     })
