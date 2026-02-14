@@ -3,12 +3,8 @@
 This is the official repository for the Verity Systems Document Management System (DMS), a multi-tenant SaaS application built for secure document lifecycle management.
 
 ## 📖 Essential Documentation
-For developers joining the project, please read the **[ARCHITECTURE.md](./ARCHITECTURE.md)** guide first. It covers:
-- Complete Folder Structure
-- Authentication & Session Management Logic
-- Role-Based Access Control (RBAC) Hardening
-- Tenant Isolation Standards
-- API Documentation (Swagger)
+- [ARCHITECTURE.md](./ARCHITECTURE.md) (Folder Structure & Patterns)
+- [DEPLOYMENT.md](./DEPLOYMENT.md) (Vercel & DB Setup)
 
 ---
 
