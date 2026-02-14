@@ -236,16 +236,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (token) {
             // ✅ Optimization: Check expiry locally before wasting a network call
             if (isTokenExpired(token)) {
+                console.log(`[AUTH_CONTEXT] Token expired locally, attempting refresh for ${input}`)
                 const newToken = await getRefreshTokenSingleton()
                 if (newToken) {
                     headers.set("Authorization", `Bearer ${newToken}`)
                 } else {
-                    // Refresh failed, let the request proceed to get natural 401 or fail later
+                    console.warn(`[AUTH_CONTEXT] Refresh failed for ${input}, proceeding with old token`)
                     headers.set("Authorization", `Bearer ${token}`)
                 }
             } else {
                 headers.set("Authorization", `Bearer ${token}`)
             }
+        } else {
+            console.warn(`[AUTH_CONTEXT] No access token found in state while fetching ${input}`)
         }
 
         // Auto-set Content-Type for JSON

@@ -6,7 +6,7 @@ import { generateRefreshToken } from "@/lib/auth/refresh-token"
 import { getUserPermissions } from "@/lib/auth/permission"
 import { createAuditLog } from "@/lib/audit"
 
-const ACCESS_TOKEN_EXP = "1m"
+const ACCESS_TOKEN_EXP = "15m"
 const REFRESH_TOKEN_DAYS = 7
 
 export async function POST(req: Request) {
@@ -185,9 +185,20 @@ export async function POST(req: Request) {
         })
 
         // Set cookies for middleware access
+        const host = req.headers.get("host") || "";
+        // Regex to match localhost OR any IPv4 address (with optional port)
+        const isLocal = host.includes("localhost") ||
+            host.includes("127.0.0.1") ||
+            host.includes("::1") ||
+            /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}(?::[0-9]+)?$/.test(host);
+
+        const secure = process.env.NODE_ENV === "production" && !isLocal;
+
+        console.log(`[AUTH_LOGIN] Host: ${host} | isLocal: ${isLocal} | Secure: ${secure}`);
+
         const cookieOptions = {
             httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
+            secure,
             sameSite: "lax" as const,
             path: "/",
             maxAge: REFRESH_TOKEN_DAYS * 24 * 60 * 60 // Match refresh token expiry

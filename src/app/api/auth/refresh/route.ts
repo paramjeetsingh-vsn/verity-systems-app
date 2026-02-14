@@ -129,9 +129,18 @@ export async function POST(req: Request) {
         }
     })
 
+    const host = req.headers.get("host") || "";
+    const isLocal = host.includes("localhost") ||
+        host.includes("127.0.0.1") ||
+        host.includes("::1") ||
+        /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}(?::[0-9]+)?$/.test(host);
+
+    const secure = process.env.NODE_ENV === "production" && !isLocal;
+    // console.log(`[AUTH_REFRESH] Host: ${host} | isLocal: ${isLocal} | Secure: ${secure}`);
+
     const cookieOptions = {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
+        secure,
         sameSite: "lax" as const,
         path: "/",
         maxAge: REFRESH_TOKEN_DAYS * 24 * 60 * 60

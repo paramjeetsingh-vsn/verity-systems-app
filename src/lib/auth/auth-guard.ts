@@ -19,6 +19,7 @@ export async function requireAuth(req: Request): Promise<AuthUser> {
     const authHeader = req.headers.get("authorization")
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
+        console.warn(`[AUTH_GUARD] Unauthorized: Missing or invalid Authorization header for ${req.url}`)
         throw NextResponse.json({ message: "Unauthorized" }, { status: 401 })
     }
 
@@ -54,10 +55,19 @@ export async function requireAuth(req: Request): Promise<AuthUser> {
         });
 
         if (!session || session.revokedAt) {
-            throw NextResponse.json(
-                { message: "Session revoked or invalid" },
-                { status: 401 }
-            );
+            // 🕒 RACE CONDITION GRACE PERIOD
+            const GRACE_PERIOD_MS = 30 * 1000;
+            const isWithinGrace = session?.revokedAt && (Date.now() - new Date(session.revokedAt).getTime() < GRACE_PERIOD_MS);
+
+            if (!isWithinGrace) {
+                console.warn(`[AUTH_GUARD] Session ${user.sid} is ${!session ? 'NOT FOUND' : 'REVOKED'} for user ${user.sub}`)
+                throw NextResponse.json(
+                    { message: "Session revoked or invalid" },
+                    { status: 401 }
+                );
+            }
+            // else: Continue if within grace period
+            // console.log(`[AUTH_GUARD] Session ${user.sid} is revoked but within grace period. Allowing.`)
         }
     }
 

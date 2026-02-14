@@ -27,5 +27,25 @@ export const authPaths = {
                 }
             }
         }
+    },
+    "/api/auth/logout": {
+        post: {
+            tags: ["Auth"],
+            summary: "Logout",
+            security: [{ bearerAuth: [] }],
+            responses: {
+                200: { description: "Logout successful" }
+            }
+        }
+    },
+    "/api/auth/refresh": {
+        post: {
+            tags: ["Auth"],
+            summary: "Refresh Access Token",
+            responses: {
+                200: { description: "Token refreshed" },
+                401: { description: "Invalid refresh token" }
+            }
+        }
     }
 }

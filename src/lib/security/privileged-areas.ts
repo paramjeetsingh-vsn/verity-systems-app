@@ -28,4 +28,9 @@ export const PRIVILEGED_AREAS: Record<string, PrivilegedArea> = {
         requiredPermissions: [15, 'data:export' as any],
         alertCode: 'UNAUTHORIZED_EXPORT_ACCESS_ATTEMPT',
     },
+    API_ADMIN: {
+        path: '/api/admin',
+        requiredPermissions: [PermissionId.ADMIN_ACCESS, 'ADMIN_ACCESS' as any],
+        alertCode: 'UNAUTHORIZED_API_ADMIN_ACCESS_ATTEMPT',
+    },
 };

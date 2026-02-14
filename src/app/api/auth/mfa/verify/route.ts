@@ -111,7 +111,18 @@ export async function POST(req: Request) {
         const roleIds = user.userRoles.map((ur) => ur.role.id);
         const { ids: permissionIds, codes: permissions } = await getUserPermissions(userId, user.tenantId);
 
-        // 2. Access Token (with AMR claim)
+        // 4. Create new refresh token (mfaVerified: true)
+        const { token: refreshToken, hash } = generateRefreshToken();
+        const newRefreshTokenRecord = await prisma.refreshToken.create({
+            data: {
+                userId: user.id,
+                tokenHash: hash,
+                mfaVerified: true,
+                expiresAt: new Date(Date.now() + REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000)
+            }
+        });
+
+        // 2. Access Token (with AMR claim and SID)
         const accessToken = signJwt(
             {
                 sub: user.id,
@@ -121,28 +132,12 @@ export async function POST(req: Request) {
                 roleIds,
                 permissions,
                 permissionIds,
-                amr: ["pwd", "mfa"], // Authentication Method Reference
-                mfaEnabled: true
+                amr: ["pwd", "mfa"],
+                mfaEnabled: true,
+                sid: newRefreshTokenRecord.id // ADDED SID
             },
             { expiresIn: ACCESS_TOKEN_EXP }
         );
-
-        // 3. Revoke old refresh tokens
-        await prisma.refreshToken.updateMany({
-            where: { userId: user.id, revokedAt: null },
-            data: { revokedAt: new Date() }
-        });
-
-        // 4. Create new refresh token (mfaVerified: true)
-        const { token: refreshToken, hash } = generateRefreshToken();
-        await prisma.refreshToken.create({
-            data: {
-                userId: user.id,
-                tokenHash: hash,
-                mfaVerified: true,
-                expiresAt: new Date(Date.now() + REFRESH_TOKEN_DAYS * 24 * 60 * 60 * 1000)
-            }
-        });
 
         // Create response with cookies
         const response = NextResponse.json({
@@ -161,9 +156,18 @@ export async function POST(req: Request) {
             }
         });
 
+        const host = req.headers.get("host") || "";
+        const isLocal = host.includes("localhost") ||
+            host.includes("127.0.0.1") ||
+            host.includes("::1") ||
+            /^(?:[0-9]{1,3}\.){3}[0-9]{1,3}(?::[0-9]+)?$/.test(host);
+
+        const secure = process.env.NODE_ENV === "production" && !isLocal;
+        console.log(`[AUTH_MFA_VERIFY] Host: ${host} | isLocal: ${isLocal} | Secure: ${secure}`);
+
         const cookieOptions = {
             httpOnly: true,
-            secure: process.env.NODE_ENV === "production",
+            secure,
             sameSite: "lax" as const,
             path: "/",
             maxAge: REFRESH_TOKEN_DAYS * 24 * 60 * 60

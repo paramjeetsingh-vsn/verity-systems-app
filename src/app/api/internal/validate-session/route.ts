@@ -12,6 +12,7 @@ export async function POST(req: Request) {
         const { sid } = await req.json();
 
         if (!sid) {
+            console.warn(`[INTERNAL_VALIDATE_SESSION] No SID provided in request`)
             return NextResponse.json({ valid: false, reason: "No SID provided" });
         }
 
@@ -34,6 +35,18 @@ export async function POST(req: Request) {
         }
 
         if (session.revokedAt) {
+            // 🕒 RACE CONDITION GRACE PERIOD
+            // If the session was revoked very recently (e.g. < 30s) AND it was replaced,
+            // we allow it for the middleware transition period.
+            const GRACE_PERIOD_MS = 30 * 1000;
+            const revokedTime = new Date(session.revokedAt).getTime();
+            const now = Date.now();
+
+            if (now - revokedTime < GRACE_PERIOD_MS) {
+                // console.log(`[INTERNAL_VALIDATE_SESSION] Session ${sid} is REVOKED but within grace period.`)
+                return NextResponse.json({ valid: true, grace: true });
+            }
+
             return NextResponse.json({ valid: false, reason: "Session revoked" });
         }
 
@@ -42,9 +55,11 @@ export async function POST(req: Request) {
         }
 
         if (!session.user.isActive) {
+            console.warn(`[INTERNAL_VALIDATE_SESSION] User deactivated for session ${sid}`)
             return NextResponse.json({ valid: false, reason: "User deactivated" });
         }
 
+        // console.log(`[INTERNAL_VALIDATE_SESSION] Session ${sid} is VALID`)
         return NextResponse.json({ valid: true });
 
     } catch (error) {
