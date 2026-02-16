@@ -16,6 +16,7 @@ import {
     Lock,
     X,
     Activity,
+    FolderOpen,
 } from "lucide-react";
 import { clsx } from "clsx";
 import { useAuth } from "@/lib/auth/auth-context";
@@ -35,6 +36,16 @@ const navItems = [
             { name: "Sessions", href: "/admin/sessions", icon: Activity, permission: PermissionId.AUDIT_VIEW },
             { name: "Permissions", href: "/admin/permissions", icon: Lock, permission: PermissionId.PERMISSION_VIEW },
             { name: "Audit Log", href: "/admin/audit", icon: FileText, permission: PermissionId.AUDIT_VIEW },
+        ]
+    },
+    {
+        name: "Documents",
+        href: "/dms",
+        icon: FolderOpen,
+        permission: PermissionId.DMS_VIEW,
+        children: [
+            { name: "My Documents", href: "/dms", icon: FileText, permission: PermissionId.DMS_VIEW },
+            { name: "Audit", href: "/dms/audit", icon: Activity, permission: PermissionId.ADMIN_ACCESS },
         ]
     },
     { name: "Reports", href: "/reports", icon: FileText },
@@ -135,7 +146,11 @@ export function Sidebar({ mobileOpen, setMobileOpen }) {
     const { user } = useAuth();
 
     const toggleMenu = (name) => {
-        setExpandedMenus(prev => ({ ...prev, [name]: !prev[name] }));
+        setExpandedMenus(prev => {
+            // If the clicked menu is already open, close it (empty state).
+            // If it's closed, open it and strictly close others (state with only this menu).
+            return prev[name] ? {} : { [name]: true };
+        });
     };
 
     const handleMobileNavigate = () => {

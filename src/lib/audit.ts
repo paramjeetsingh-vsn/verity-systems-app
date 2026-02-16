@@ -5,8 +5,11 @@ interface AuditLogParams {
     tenantId: number;
     actorUserId?: number;
     targetUserId?: number;
+    entityType?: string;
+    entityId?: string;
     action: string;
     details?: string;
+    metadata?: Record<string, any>;
     ipAddress?: string;
 }
 
@@ -26,8 +29,11 @@ export async function createAuditLog(
                 tenantId: params.tenantId,
                 actorUserId: params.actorUserId,
                 targetUserId: params.targetUserId,
+                entityType: params.entityType,
+                entityId: params.entityId,
                 action: params.action,
                 details: params.details,
+                metadata: params.metadata || undefined,
                 ipAddress: params.ipAddress,
             }
         });

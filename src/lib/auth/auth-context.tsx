@@ -252,7 +252,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         // Auto-set Content-Type for JSON
-        if (init.body && !headers.has("Content-Type")) {
+        if (init.body && !headers.has("Content-Type") && !(init.body instanceof FormData)) {
             headers.set("Content-Type", "application/json")
         }
 

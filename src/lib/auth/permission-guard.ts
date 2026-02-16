@@ -19,5 +19,11 @@ export async function requirePermission(
         )
     }
 
-    return user
+    const userWithPermissions = {
+        ...user,
+        permissions: codes,
+        permissionIds: ids
+    }
+
+    return userWithPermissions
 }

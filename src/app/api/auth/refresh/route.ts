@@ -36,7 +36,7 @@ export async function POST(req: Request) {
     const record = await prisma.refreshToken.findFirst({
         where: {
             tokenHash,
-            revokedAt: null,
+            // revokedAt: null, // Allow finding revoked tokens to check grace period
             expiresAt: { gt: new Date() }
         },
         include: {
@@ -57,17 +57,40 @@ export async function POST(req: Request) {
         )
     }
 
-    // 🔁 Revoke OLD refresh token
+    // Reuse Detection with Grace Period (30s)
+    let isReusing = false;
+    if (record.revokedAt) {
+        const timeSinceRevocation = Date.now() - new Date(record.revokedAt).getTime();
+        const GRACE_PERIOD_MS = 30 * 1000; // 30 seconds
+
+        if (timeSinceRevocation > GRACE_PERIOD_MS) {
+            console.warn(`[AUTH_REFRESH] Token reuse detected OUTSIDE grace period. User: ${record.userId}`);
+            // Potential theft - strictly deny
+            return NextResponse.json(
+                { message: "Refresh token reused/invalid" },
+                { status: 401 }
+            )
+        }
+
+        console.log(`[AUTH_REFRESH] Token reuse detected WITHIN grace period (${timeSinceRevocation}ms). User: ${record.userId}`);
+        isReusing = true;
+    }
+
+    // 🔁 Revoke OLD refresh token (Only if not already revoked)
     const { token: newRefreshToken, hash: newHash } =
         generateRefreshToken()
 
-    await prisma.refreshToken.update({
-        where: { id: record.id },
-        data: {
-            revokedAt: new Date(),
-            replacedByToken: newHash
-        }
-    })
+    if (!isReusing) {
+        await prisma.refreshToken.update({
+            where: { id: record.id },
+            data: {
+                revokedAt: new Date(),
+                replacedByToken: newHash
+            }
+        })
+    }
+    // Else: It was already revoked, so we preserve the original revocation reason/time.
+    // We strictly fork the chain here by issuing a new token that points back to the user/session.
 
     // 🔁 Generate NEW refresh token
     const newRecord = await prisma.refreshToken.create({

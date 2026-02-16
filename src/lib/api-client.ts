@@ -8,7 +8,7 @@ export async function handleAPIResponse<T>(res: Response): Promise<T> {
             const text = await res.text()
             if (text) {
                 const data = JSON.parse(text)
-                message = data.message || data.error || message
+                message = data.message || (data.error && data.error.message) || (typeof data.error === 'string' ? data.error : JSON.stringify(data.error)) || message
             }
         } catch {
             // ignore parse errors

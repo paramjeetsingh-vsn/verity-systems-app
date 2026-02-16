@@ -2,6 +2,13 @@ import { NextResponse } from "next/server"
 import type { NextRequest } from "next/server"
 import { PRIVILEGED_AREAS } from "./lib/security/privileged-areas"
 
+// --- Rate Limiting State ---
+// Simple in-memory store for rate limiting (Note: In serverless/edge, this memory is not shared)
+// For production, use Redis/Upstash.
+const rateLimit = new Map<string, { count: number; expires: number }>();
+const WINDOW_MS = 60 * 1000; // 1 minute
+const MAX_REQUESTS = 20; // 20 requests per minute per IP
+
 /**
  * Simple JWT decoder for Middleware (Safe for Edge Runtime)
  */
@@ -23,15 +30,41 @@ function parseJwt(token: string) {
     }
 }
 
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
     const { pathname } = request.nextUrl
-    const host = request.headers.get("host")
-    const cookies = request.cookies.getAll().map(c => c.name)
 
-    // console.log(`[MIDDLEWARE] Handling ${pathname} | Host: ${host} | Cookies: ${JSON.stringify(cookies)}`)
-    console.log(`[MIDDLEWARE] Path: ${pathname} | Host: ${host} | Cookies: ${cookies.join(", ")}`)
+    // -------------------------------------------------------------------------
+    // 1. Rate Limiting (Public Routes)
+    // -------------------------------------------------------------------------
+    if (pathname.startsWith('/api/public')) {
+        const ip = request.ip || 'anonymous';
+        const now = Date.now();
 
-    // 1️⃣ Find if the path belongs to a privileged area
+        const record = rateLimit.get(ip);
+
+        if (record && now < record.expires) {
+            if (record.count >= MAX_REQUESTS) {
+                return new NextResponse(
+                    JSON.stringify({ message: "Too many requests. Please try again later." }),
+                    { status: 429, headers: { 'Content-Type': 'application/json' } }
+                );
+            }
+            record.count++;
+        } else {
+            rateLimit.set(ip, { count: 1, expires: now + WINDOW_MS });
+        }
+
+        // Cleanup old records occasionally
+        if (rateLimit.size > 1000) {
+            for (const [key, val] of rateLimit.entries()) {
+                if (now > val.expires) rateLimit.delete(key);
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // 2. Privileged Area Security Standard (PASS)
+    // -------------------------------------------------------------------------
     const matchingAreaKey = Object.keys(PRIVILEGED_AREAS).find(key =>
         pathname.startsWith(PRIVILEGED_AREAS[key].path)
     )
@@ -48,9 +81,8 @@ export async function proxy(request: NextRequest) {
             }
         }
 
-        // 2️⃣ Authenticate
+        // Authenticate
         if (!accessToken) {
-            console.warn(`[MIDDLEWARE] Unauthorized: No accessToken cookie found for path ${pathname}`)
             if (pathname.startsWith('/api/')) {
                 return NextResponse.json({ message: "Authentication required" }, { status: 401 })
             }
@@ -59,17 +91,13 @@ export async function proxy(request: NextRequest) {
 
         const payload = parseJwt(accessToken)
         if (!payload) {
-            console.warn(`[MIDDLEWARE] Unauthorized: Failed to parse JWT payload for path ${pathname}`)
             if (pathname.startsWith('/api/')) {
                 return NextResponse.json({ message: "Invalid token" }, { status: 401 })
             }
             return NextResponse.redirect(new URL("/login", request.url))
         }
 
-        // console.log(`[MIDDLEWARE] Authenticated: sub=${payload.sub}, sid=${payload.sid}, exp=${new Date(payload.exp * 1000).toISOString()}`)
-        console.log(`[MIDDLEWARE] JWT Payload Found: sub=${payload.sub}, sid=${payload.sid}`)
-
-        // ⚡ Session Validation (Instant Revocation)
+        // Session Validation (Instant Revocation)
         if (payload.sid) {
             try {
                 const origin = request.nextUrl.origin
@@ -85,7 +113,6 @@ export async function proxy(request: NextRequest) {
                 if (validationRes.ok) {
                     const validation = await validationRes.json()
                     if (!validation.valid) {
-                        console.warn(`[MIDDLEWARE] Session ${payload.sid} invalid: ${validation.reason}`)
                         if (pathname.startsWith('/api/')) {
                             const response = NextResponse.json({ message: `Session invalid: ${validation.reason}` }, { status: 401 })
                             response.cookies.delete("accessToken")
@@ -100,13 +127,10 @@ export async function proxy(request: NextRequest) {
                 }
             } catch (err) {
                 console.error("Session validation fetch error:", err)
-                // Fail open or closed? Usually fail open for auth token availability if it's technically valid, 
-                // but here it's better to log and continue if the internal API is down, 
-                // as requireAuth in the API will still check.
             }
         }
 
-        // 3️⃣ Authorize
+        // Authorize
         let isAuthorized = false
 
         // Role-based check
@@ -119,7 +143,7 @@ export async function proxy(request: NextRequest) {
             })
         }
 
-        // Permission-based check (if not already authorized by role)
+        // Permission-based check
         if (!isAuthorized && area.requiredPermissions) {
             isAuthorized = area.requiredPermissions.some(perm => {
                 if (typeof perm === 'number') {
@@ -129,16 +153,10 @@ export async function proxy(request: NextRequest) {
             })
         }
 
-        // 4️⃣ Handle Unauthorized
+        // Handle Unauthorized
         if (!isAuthorized) {
-            console.warn(`[MIDDLEWARE] Access denied to ${pathname} for user ${payload.sub}. 
-                Required Roles: ${JSON.stringify(area.requiredRoles)} 
-                Required Perms: ${JSON.stringify(area.requiredPermissions)}
-                User Roles: ${JSON.stringify(payload.roles)}
-                User Perms: ${JSON.stringify(payload.permissionIds)}`)
             try {
                 const origin = request.nextUrl.origin
-                // Fire-and-forget security alert
                 fetch(`${origin}/api/internal/security-alert`, {
                     method: "POST",
                     headers: {
@@ -148,7 +166,7 @@ export async function proxy(request: NextRequest) {
                     body: JSON.stringify({
                         userId: payload.sub || 0,
                         tenantId: payload.tenantId || 0,
-                        action: "UNAUTHORIZED_ACCESS_ATTEMPT", // Generalized identifier
+                        action: "UNAUTHORIZED_ACCESS_ATTEMPT",
                         details: JSON.stringify({
                             path: pathname,
                             alertCode: area.alertCode
@@ -160,8 +178,6 @@ export async function proxy(request: NextRequest) {
                 console.error("Failed to trigger security alert from middleware:", err)
             }
 
-            // Redirect to dashboard (Avoid loops or direct 403 for better UX)
-            console.log(`[MIDDLEWARE] Access denied for ${pathname}. Redirecting/Blocking.`)
             if (pathname.startsWith('/api/')) {
                 return NextResponse.json({ message: "Forbidden: Admin access required" }, { status: 403 })
             }
@@ -172,9 +188,13 @@ export async function proxy(request: NextRequest) {
     return NextResponse.next()
 }
 
-// Optimization: Match all domains declared in PASS
-// Note: matcher must be static strings, so we can't easily generate it from PRIVILEGED_AREAS keys
-// but we can list the known prefixes.
 export const config = {
-    matcher: ["/admin", "/admin/:path*", "/billing/:path*", "/compliance/:path*", "/exports/:path*", "/api/admin/:path*"]
+    matcher: [
+        "/admin", "/admin/:path*",
+        "/billing/:path*",
+        "/compliance/:path*",
+        "/exports/:path*",
+        "/api/admin/:path*",
+        "/api/public/:path*"
+    ]
 }

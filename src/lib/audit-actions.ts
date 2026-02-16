@@ -37,6 +37,12 @@ export const MFA_VERIFIED = "MFA_VERIFIED"
 export const ROLE_ASSIGNED = "ROLE_ASSIGNED"
 export const ROLE_REVOKED = "ROLE_REVOKED"
 
+// DMS Actions
+export const DMS_SUBMIT = "DMS.SUBMIT"
+export const DMS_APPROVE = "DMS.APPROVE"
+export const DMS_REJECT = "DMS.REJECT"
+export const DMS_ARCHIVE = "DMS.ARCHIVE"
+
 /**
  * Type for all audit actions
  */
@@ -61,3 +67,7 @@ export type AuditAction =
     | typeof MFA_VERIFIED
     | typeof ROLE_ASSIGNED
     | typeof ROLE_REVOKED
+    | typeof DMS_SUBMIT
+    | typeof DMS_APPROVE
+    | typeof DMS_REJECT
+    | typeof DMS_ARCHIVE

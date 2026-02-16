@@ -34,6 +34,24 @@ async function main() {
         { id: 10, code: 'PERMISSION_VIEW', description: 'View permissions' },
         { id: 11, code: 'AUDIT_VIEW', description: 'View audit logs' },
         { id: 12, code: 'ADMIN_ACCESS', description: 'Access admin panel' },
+        { id: 20, code: 'DMS_VIEW', description: 'View documents and folders' },
+        { id: 21, code: 'DMS_DOCUMENT_EDIT', description: 'Edit documents' },
+        { id: 22, code: 'DMS_DOCUMENT_APPROVE', description: 'Approve documents' },
+        { id: 23, code: 'DMS_DOCUMENT_DELETE', description: 'Delete documents' },
+        { id: 24, code: 'DMS_DOCUMENT_SUBMIT', description: 'Submit documents' },
+        { id: 25, code: 'DMS_DOCUMENT_REJECT', description: 'Reject documents' },
+        { id: 26, code: 'DMS_DOCUMENT_OBSOLETE', description: 'Mark documents as obsolete' },
+        { id: 27, code: 'DMS_FOLDER_READ', description: 'Read/View folders' },
+        { id: 28, code: 'DMS_FOLDER_CREATE', description: 'Create folders' },
+        { id: 29, code: 'DMS_FOLDER_UPDATE', description: 'Update/Move folders' },
+        { id: 30, code: 'DMS_FOLDER_DELETE', description: 'Delete folders' },
+        { id: 31, code: 'DMS_DOCUMENT_CREATE', description: 'Create new document records' },
+        { id: 32, code: 'DMS_DOCUMENT_READ', description: 'Read/View documents' },
+        { id: 33, code: 'DMS_DOCUMENT_UPLOAD', description: 'Upload new document versions' },
+        { id: 34, code: 'DMS_SHARE_CREATE', description: 'Create document share links' },
+        { id: 35, code: 'DMS_SHARE_READ', description: 'Read/View share links' },
+        { id: 36, code: 'DMS_SHARE_REVOKE', description: 'Revoke share links' },
+        { id: 37, code: 'DMS_DOCUMENT_TYPE_MANAGE', description: 'Manage document types (CRUD)' },
     ]
 
     for (const perm of permissions) {
@@ -146,7 +164,7 @@ async function main() {
     const userPermissions = await prisma.permission.findMany({
         where: {
             code: {
-                in: ['USER_VIEW'],
+                in: ['USER_VIEW', 'DMS_VIEW', 'DMS_DOCUMENT_EDIT', 'DMS_DOCUMENT_SUBMIT'],
             },
         },
     })
