@@ -30,8 +30,12 @@ export function CreateDocumentModal({ isOpen, onClose, folderId, onSuccess }: Cr
     const [description, setDescription] = useState("")
     const [expiryDate, setExpiryDate] = useState("")
     const [typeId, setTypeId] = useState("")
+    const [selectedFolderId, setSelectedFolderId] = useState(folderId || "")
+    const [selectedFolderName, setSelectedFolderName] = useState("")
 
+    // Data State
     const [documentTypes, setDocumentTypes] = useState<DocumentType[]>([])
+    const [folders, setFolders] = useState<{ id: string, name: string }[]>([])
     const [loadingTypes, setLoadingTypes] = useState(false)
 
     const [creating, setCreating] = useState(false)
@@ -41,15 +45,37 @@ export function CreateDocumentModal({ isOpen, onClose, folderId, onSuccess }: Cr
     useEffect(() => {
         if (isOpen) {
             loadDocumentTypes();
+            if (!folderId) {
+                loadFolders();
+            } else {
+                setSelectedFolderId(folderId);
+                fetchFolderName(folderId);
+            }
         }
-    }, [isOpen]);
+    }, [isOpen, folderId]);
+
+    const fetchFolderName = async (id: string) => {
+        try {
+            const folder = await fetchWithAuth<{ id: string, name: string }>(`/api/secure/dms/folders/${id}`);
+            setSelectedFolderName(folder.name);
+        } catch (err) {
+            console.error("Failed to fetch folder name", err);
+        }
+    }
+
+    const loadFolders = async () => {
+        try {
+            const data = await fetchWithAuth<{ id: string, name: string }[]>("/api/secure/dms/folders");
+            setFolders(data);
+        } catch (err) {
+            console.error("Failed to load folders", err);
+        }
+    }
 
     const loadDocumentTypes = async () => {
         try {
             setLoadingTypes(true);
-            setLoadingTypes(true);
             const types = await fetchWithAuth<DocumentType[]>("/api/secure/dms/document-types?active=true");
-            setDocumentTypes(types);
             setDocumentTypes(types);
         } catch (err) {
             console.error("Failed to load document types", err);
@@ -61,6 +87,10 @@ export function CreateDocumentModal({ isOpen, onClose, folderId, onSuccess }: Cr
     const handleCreate = async (e: React.FormEvent) => {
         e.preventDefault()
         if (!title.trim()) return
+        if (!selectedFolderId) {
+            setError("Please select a folder.");
+            return;
+        }
 
         try {
             setCreating(true)
@@ -71,7 +101,7 @@ export function CreateDocumentModal({ isOpen, onClose, folderId, onSuccess }: Cr
                 body: JSON.stringify({
                     title,
                     description,
-                    folderId,
+                    folderId: selectedFolderId,
                     typeId: typeId || undefined,
                     expiryDate: expiryDate ? new Date(expiryDate) : undefined
                 })
@@ -94,16 +124,38 @@ export function CreateDocumentModal({ isOpen, onClose, folderId, onSuccess }: Cr
         setDescription("")
         setExpiryDate("")
         setTypeId("")
+        if (!folderId) {
+            setSelectedFolderId("") // Only reset if not passed as prop
+            setSelectedFolderName("")
+        }
         setError(null)
         setSuccess(false)
         onClose()
     }
 
+    const handleFolderSelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
+        const id = e.target.value;
+        setSelectedFolderId(id);
+        const folder = folders.find(f => f.id === id);
+        setSelectedFolderName(folder ? folder.name : "");
+    }
+
+    const modalTitle = (
+        <div className="flex flex-col">
+            <span>Create New Document</span>
+            {selectedFolderName && (
+                <span className="text-sm font-normal text-muted-foreground">
+                    (in {selectedFolderName})
+                </span>
+            )}
+        </div>
+    )
+
     return (
         <Modal
             isOpen={isOpen}
             onClose={handleClose}
-            title="Create New Document"
+            title={modalTitle}
             footer={
                 <div className="flex justify-end gap-3 w-full">
                     <button
@@ -116,9 +168,9 @@ export function CreateDocumentModal({ isOpen, onClose, folderId, onSuccess }: Cr
                     <button
                         onClick={handleCreate}
                         className="px-4 py-2 text-sm font-medium bg-primary text-primary-foreground hover:bg-primary/90 rounded-md shadow-sm disabled:opacity-50 flex items-center gap-2 transition-all"
-                        disabled={!title.trim() || creating || success}
+                        disabled={!title.trim() || !selectedFolderId || creating || success}
                     >
-                        {creating ? <Loader2 size={16} className="animate-spin" /> : <Plus size={16} />}
+                        {creating ? <Loader2 size={16} className="animate-spin" /> : <FilePlus size={16} />}
                         {creating ? "Creating..." : success ? "Created!" : "Create Draft"}
                     </button>
                 </div>
@@ -142,6 +194,26 @@ export function CreateDocumentModal({ isOpen, onClose, folderId, onSuccess }: Cr
                             required
                         />
                     </div>
+
+                    {!folderId && (
+                        <div className="space-y-2 col-span-2">
+                            <label className="text-sm font-medium leading-none flex items-center gap-2">
+                                <FolderIcon size={14} />
+                                Select Folder <span className="text-red-500">*</span>
+                            </label>
+                            <select
+                                value={selectedFolderId}
+                                onChange={handleFolderSelect}
+                                className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                                required
+                            >
+                                <option value="">Select a Folder...</option>
+                                {folders.map(folder => (
+                                    <option key={folder.id} value={folder.id}>{folder.name}</option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
 
                     <div className="space-y-2">
                         <label className="text-sm font-medium leading-none flex items-center gap-2">
@@ -219,6 +291,24 @@ function Plus({ size }: { size: number }) {
         >
             <path d="M5 12h14" />
             <path d="M12 5v14" />
+        </svg>
+    )
+}
+
+function FolderIcon({ size }: { size: number }) {
+    return (
+        <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width={size}
+            height={size}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+        >
+            <path d="M4 20h16a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.93a2 2 0 0 1-1.66-.9l-.82-1.2A2 2 0 0 0 7.93 3H4a2 2 0 0 0-2 2v13c0 1.1.9 2 2 2Z" />
         </svg>
     )
 }

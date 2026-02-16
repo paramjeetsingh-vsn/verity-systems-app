@@ -4,6 +4,7 @@ import { AuthUser } from "@/lib/auth/auth-types";
 import { createAuditLog } from "@/lib/audit";
 import { DocumentStatus } from "@prisma/client";
 import { resolveEffectiveStatus } from "@/lib/dms/status-utils";
+import { FolderService } from "./folder-service";
 import { DocumentNotFoundError, FolderNotFoundError, DocumentLockedError } from "@/lib/dms/errors";
 
 export interface CreateDocumentParams {
@@ -39,6 +40,11 @@ export class DocumentService {
         const db = tx || globalPrisma;
 
         return await db.$transaction(async (innerTx: any) => {
+            // 0. Enforce Folder Selection (No Root Documents)
+            if (!folderId) {
+                throw new Error("Documents must be created within a folder. Please select a folder.");
+            }
+
             // 1. Verify folder exists and belongs to tenant (if folderId provided)
             let folder = null;
             if (folderId) {
@@ -168,42 +174,187 @@ export class DocumentService {
      * Lists documents in a folder or by search criteria.
      * Returns effective status for each document.
      */
+    /**
+     * listDocuments
+     * 
+     * Lists documents with advanced filtering, sorting, and pagination.
+     */
     static async listDocuments(params: {
         tenantId: number;
         folderId?: string;
+        includeSubfolders?: boolean;
         search?: string;
+        status?: DocumentStatus[];
+        typeIds?: string[];
+        expiryFilter?: 'expired' | 'expiring_30' | 'expiring_90' | 'custom';
+        expiryFrom?: Date;
+        expiryTo?: Date;
+        versionFrom?: number;
+        versionTo?: number;
+        sortBy?: 'documentNumber' | 'title' | 'status' | 'expiryDate' | 'version' | 'createdAt';
+        sortOrder?: 'asc' | 'desc';
+        page?: number;
+        limit?: number;
     }) {
-        const { tenantId, folderId, search } = params;
+        const {
+            tenantId,
+            folderId,
+            includeSubfolders,
+            search,
+            status,
+            typeIds,
+            expiryFilter,
+            expiryFrom,
+            expiryTo,
+            versionFrom,
+            versionTo,
+            sortBy = 'createdAt',
+            sortOrder = 'desc',
+            page = 1,
+            limit = 50
+        } = params;
 
-        const documents = await globalPrisma.document.findMany({
-            where: {
-                tenantId,
-                ...(folderId && { folderId }),
-                ...(search && {
-                    title: { contains: search, mode: 'insensitive' }
-                })
-            },
-            include: {
-                currentVersion: {
-                    select: { id: true, fileName: true, versionNumber: true }
-                },
-                createdBy: {
-                    select: { fullName: true, email: true }
-                },
-                updatedBy: {
-                    select: { fullName: true, email: true }
-                },
-                type: {
-                    select: { id: true, name: true }
+        // 1. Build Where Clause
+        const where: any = {
+            tenantId
+        };
+
+        // Folder Filter
+        if (folderId) {
+            if (includeSubfolders) {
+                const folderIds = await FolderService.getRecursiveFolderIds(folderId, tenantId);
+                where.folderId = { in: folderIds };
+            } else {
+                where.folderId = folderId;
+            }
+        }
+
+        // Search (Title or Document Number)
+        if (search) {
+            where.OR = [
+                { title: { contains: search, mode: 'insensitive' } },
+                { documentNumber: { contains: search, mode: 'insensitive' } }
+            ];
+        }
+
+        // Status Filter
+        if (status && status.length > 0) {
+            where.status = { in: status };
+        }
+
+        // Type Filter
+        if (typeIds && typeIds.length > 0) {
+            where.typeId = { in: typeIds };
+        }
+
+        // Version Filter
+        if (versionFrom !== undefined || versionTo !== undefined) {
+            where.currentVersion = {
+                versionNumber: {
+                    ...(versionFrom !== undefined && { gte: versionFrom }),
+                    ...(versionTo !== undefined && { lte: versionTo })
                 }
-            },
-            orderBy: { updatedAt: 'desc' }
-        });
+            };
+        }
 
-        return documents.map(doc => ({
-            ...doc,
-            effectiveStatus: resolveEffectiveStatus(doc)
-        }));
+        // Expiry Filter
+        const now = new Date();
+        if (expiryFilter) {
+            switch (expiryFilter) {
+                case 'expired':
+                    // Expired: date < now AND status = APPROVED (usually) or just date check?
+                    // User requirement: "expired -> expiryDate < now AND status = APPROVED"
+                    where.expiryDate = { lt: now };
+                    where.status = DocumentStatus.APPROVED;
+                    break;
+                case 'expiring_30':
+                    const plus30 = new Date(now);
+                    plus30.setDate(plus30.getDate() + 30);
+                    where.expiryDate = { gte: now, lte: plus30 };
+                    break;
+                case 'expiring_90':
+                    const plus90 = new Date(now);
+                    plus90.setDate(plus90.getDate() + 90);
+                    where.expiryDate = { gte: now, lte: plus90 };
+                    break;
+                case 'custom':
+                    if (expiryFrom || expiryTo) {
+                        where.expiryDate = {
+                            ...(expiryFrom && { gte: expiryFrom }),
+                            ...(expiryTo && { lte: expiryTo })
+                        };
+                    }
+                    break;
+            }
+        }
+
+        // 2. Build OrderBy
+        let orderBy: any = {};
+        switch (sortBy) {
+            case 'documentNumber':
+                orderBy = { documentNumber: sortOrder };
+                break;
+            case 'title':
+                orderBy = { title: sortOrder };
+                break;
+            case 'status':
+                orderBy = { status: sortOrder };
+                break;
+            case 'expiryDate':
+                orderBy = { expiryDate: sortOrder };
+                break;
+            case 'version':
+                // Sort by related model field
+                orderBy = { currentVersion: { versionNumber: sortOrder } };
+                break;
+            case 'createdAt':
+            default:
+                orderBy = { createdAt: sortOrder };
+                break;
+        }
+
+        // 3. Pagination
+        // Cap limit
+        const safeLimit = Math.min(Math.max(limit, 1), 100);
+        const skip = (Math.max(page, 1) - 1) * safeLimit;
+
+        // 4. Update Query: Get Count and Data
+        const [total, documents] = await Promise.all([
+            globalPrisma.document.count({ where }),
+            globalPrisma.document.findMany({
+                where,
+                include: {
+                    currentVersion: {
+                        select: { id: true, fileName: true, versionNumber: true }
+                    },
+                    createdBy: {
+                        select: { fullName: true, email: true }
+                    },
+                    updatedBy: {
+                        select: { fullName: true, email: true }
+                    },
+                    type: {
+                        select: { id: true, name: true }
+                    }
+                },
+                orderBy,
+                skip,
+                take: safeLimit
+            })
+        ]);
+
+        return {
+            data: documents.map(doc => ({
+                ...doc,
+                effectiveStatus: resolveEffectiveStatus(doc)
+            })),
+            meta: {
+                total,
+                page,
+                limit: safeLimit,
+                totalPages: Math.ceil(total / safeLimit)
+            }
+        };
     }
 
     /**

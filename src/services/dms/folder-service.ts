@@ -250,4 +250,44 @@ export class FolderService {
     static async listFoldersByParent(parentId: string | null, tenantId: number) {
         return this.listFolders({ parentId, tenantId });
     }
+
+    /**
+     * getRecursiveFolderIds
+     * 
+     * Returns an array of folder IDs including the target folder and all its descendants.
+     * Uses in-memory traversal to avoid N+1 queries.
+     */
+    static async getRecursiveFolderIds(folderId: string, tenantId: number): Promise<string[]> {
+        // 1. Fetch all folders for the tenant (lightweight select)
+        const allFolders = await globalPrisma.folder.findMany({
+            where: { tenantId },
+            select: { id: true, parentId: true }
+        });
+
+        // 2. Build adjacency list
+        const childrenMap = new Map<string, string[]>();
+        for (const f of allFolders) {
+            if (f.parentId) {
+                if (!childrenMap.has(f.parentId)) childrenMap.set(f.parentId, []);
+                childrenMap.get(f.parentId)!.push(f.id);
+            }
+        }
+
+        // 3. Traverse descendants
+        const result: string[] = [folderId];
+        const queue: string[] = [folderId];
+
+        while (queue.length > 0) {
+            const currentId = queue.shift()!;
+            const children = childrenMap.get(currentId);
+            if (children) {
+                for (const childId of children) {
+                    result.push(childId);
+                    queue.push(childId);
+                }
+            }
+        }
+
+        return result;
+    }
 }
