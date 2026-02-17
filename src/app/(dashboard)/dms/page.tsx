@@ -112,8 +112,8 @@ export default function DmsDashboard() {
     }
 
     return (
-        <div className="flex flex-col h-[calc(100vh-140px)] -m-4 sm:-m-6">
-            <div className="border-b bg-background">
+        <div className="flex flex-col h-[calc(100vh-140px)] -m-4 sm:-m-6 bg-muted/30">
+            <div className="bg-card shadow-sm">
                 <div className="flex items-center justify-between px-4 py-3 sm:px-6">
                     <div className="flex items-center gap-3 min-w-0">
                         <button
@@ -244,11 +244,11 @@ export default function DmsDashboard() {
                 </div>
             </div>
 
-            <div className="flex flex-1 overflow-hidden relative">
+            <div className="flex flex-1 overflow-hidden relative gap-4 p-4">
                 <div className={`
-                    absolute lg:relative inset-y-0 left-0 z-30 transition-transform duration-300 transform bg-background
+                    absolute lg:relative inset-y-0 left-0 z-30 transition-transform duration-300 transform
                     ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}
-                    lg:translate-x-0 ${isSidebarOpen ? "lg:w-64" : "lg:w-0"}
+                    lg:translate-x-0 ${isSidebarOpen ? "lg:w-64 lg:min-w-[256px]" : "lg:w-0 lg:min-w-0"}
                     overflow-hidden
                 `}>
                     <FolderTree
@@ -257,7 +257,7 @@ export default function DmsDashboard() {
                     />
                 </div>
 
-                <div className="flex-1 overflow-y-auto flex flex-col bg-muted/20">
+                <div className="flex-1 overflow-y-auto flex flex-col">
                     <DmsDocumentList
                         folderId={selectedFolderId}
                         folderName={selectedFolderName}

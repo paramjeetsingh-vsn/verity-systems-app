@@ -211,9 +211,9 @@ export function FolderTree({ onFolderSelect, selectedFolderId }: FolderTreeProps
     }
 
     return (
-        <div className="flex flex-col h-full bg-background/50 border-r w-64 min-w-[240px]">
+        <div className="flex flex-col h-full rounded-lg bg-card shadow-sm w-64 min-w-[240px] overflow-hidden">
             {/* Tree Header */}
-            <div className="flex items-center justify-between p-4 border-b">
+            <div className="flex items-center justify-between p-4 border-b border-border/50">
                 <div className="flex items-center gap-2 font-semibold text-sm">
                     <Folder className="text-primary" size={18} />
                     <span>Folders</span>
