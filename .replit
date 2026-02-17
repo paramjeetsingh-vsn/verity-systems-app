@@ -10,6 +10,7 @@ channel = "stable-25_05"
 [userenv.shared]
 JWT_SECRET = "replit-dms-saas-jwt-secret-change-in-prod-2024"
 NEXT_PUBLIC_APP_URL = "http://0.0.0.0:5000"
+DMS_STORAGE_PROVIDER = "local"
 
 [workflows]
 runButton = "Project"
