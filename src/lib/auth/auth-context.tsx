@@ -219,7 +219,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
        Authenticated fetch helper
     ---------------------------------------- */
 
-    const fetchWithAuth = async <T = any>(
+    const fetchWithAuth = useCallback(async <T = any>(
         input: RequestInfo | URL,
         init: RequestInit = {}
     ): Promise<T> => {
@@ -274,7 +274,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         response = await fetch(input, { ...init, headers })
 
         return handleAPIResponse<T>(response)
-    }
+    }, [logout])
 
 
     /* ----------------------------------------

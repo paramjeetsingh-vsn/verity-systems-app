@@ -1,48 +1,36 @@
 "use client"
 
-import React, { useEffect, useState, useCallback } from "react"
+import React, { useEffect, useState, useCallback, useRef } from "react"
 import { useRouter, useSearchParams, usePathname } from "next/navigation"
 import {
-    FileText,
-    MoreVertical,
-    History,
     AlertCircle,
     Loader2,
-    ChevronLeft,
-    ChevronRight,
-    ArrowUpDown,
-    Filter // Added Filter
+    Filter,
+    Plus
 } from "lucide-react"
 import { useAuth } from "@/lib/auth/auth-context"
-import { StatusBadge } from "@/components/dms/StatusBadge"
-import { DataTableHeader, SortOrder } from "@/components/dms/DataTableHeader"
-import { AdvancedFilterDrawer } from "@/components/dms/AdvancedFilterDrawer" // Added AdvancedFilterDrawer
+import { DataTable } from "@/components/dms/data-table"
+import { columns, DocumentData } from "@/components/dms/columns"
+import { AdvancedFilterDrawer } from "@/components/dms/AdvancedFilterDrawer"
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipProvider,
+    TooltipTrigger,
+} from "@/components/ui/tooltip"
 
-interface DocumentData {
-    id: string
-    title: string
-    documentNumber: string | null
-    type: { id: string, name: string } | null
-    expiryDate: string | null
-    description?: string
-    status: string
-    effectiveStatus: string
-    updatedAt: string
-    currentVersion?: {
-        id: string
-        fileName: string
-        versionNumber: number
-    }
-}
+
 
 interface DocumentListProps {
     folderId: string | null
     search?: string
     onDocumentSelect: (docId: string) => void
     onLoadComplete?: (count: number) => void
+    onCreateClick?: () => void
+    showCreateButton?: boolean
 }
 
-export function DmsDocumentList({ folderId, search = "", onDocumentSelect, onLoadComplete }: DocumentListProps) {
+export function DmsDocumentList({ folderId, search = "", onDocumentSelect, onLoadComplete, onCreateClick, showCreateButton }: DocumentListProps) {
     const { fetchWithAuth } = useAuth()
     const router = useRouter()
     const pathname = usePathname()
@@ -64,10 +52,13 @@ export function DmsDocumentList({ folderId, search = "", onDocumentSelect, onLoa
             .catch(console.error)
     }, [fetchWithAuth]);
 
+    // Stabilize search params
+    const searchParamsString = searchParams.toString()
+
     // URL State Helpers
     const createQueryString = useCallback(
         (name: string, value: string | null) => {
-            const params = new URLSearchParams(searchParams.toString())
+            const params = new URLSearchParams(searchParamsString)
             if (value === null) {
                 params.delete(name)
             } else {
@@ -75,11 +66,11 @@ export function DmsDocumentList({ folderId, search = "", onDocumentSelect, onLoa
             }
             return params.toString()
         },
-        [searchParams]
+        [searchParamsString]
     )
 
-    const updateUrl = (updates: Record<string, string | null>) => {
-        const params = new URLSearchParams(searchParams.toString())
+    const updateUrl = useCallback((updates: Record<string, string | null>) => {
+        const params = new URLSearchParams(searchParamsString)
         Object.entries(updates).forEach(([key, value]) => {
             if (value === null || value === undefined) {
                 params.delete(key)
@@ -91,17 +82,27 @@ export function DmsDocumentList({ folderId, search = "", onDocumentSelect, onLoa
         if (!updates.page) {
             params.set("page", "1")
         }
-        router.push(pathname + "?" + params.toString())
-    }
+
+        const newQueryString = params.toString()
+        if (newQueryString !== searchParamsString) {
+            router.push(pathname + "?" + newQueryString)
+        }
+    }, [searchParamsString, pathname, router])
+
+    // Use ref to avoid dependency cycle with onLoadComplete
+    const onLoadCompleteRef = useRef(onLoadComplete)
+    useEffect(() => {
+        onLoadCompleteRef.current = onLoadComplete
+    }, [onLoadComplete])
 
     const loadDocuments = useCallback(async () => {
         try {
             setLoading(true)
             setError(null)
 
-            const params = new URLSearchParams(searchParams.toString())
+            const params = new URLSearchParams(searchParamsString)
 
-            // Sync props to params (priority to props if provided, but here props are external filters)
+            // Sync props to params
             if (folderId) params.set("folderId", folderId)
             else params.delete("folderId")
 
@@ -111,15 +112,6 @@ export function DmsDocumentList({ folderId, search = "", onDocumentSelect, onLoa
             // Defaults
             if (!params.has("page")) params.set("page", "1")
 
-            // Map 'type' filter from UI to 'documentTypeIds' for API if needed, 
-            // but API expects 'documentTypeIds' or 'typeIds'. 
-            // Let's assume URL uses 'type' and we map it, OR just use 'documentTypeIds' in URL.
-            // Let's use 'type' in URL for cleaner look, map to 'documentTypeIds' here? 
-            // Actually API `route.ts` parses `documentTypeIds`. 
-            // If I use `type` in URL, I need to send `documentTypeIds` to API.
-            // But `searchParams` is passed directly? No, I construct a new `params` for fetch.
-
-            // Adjust param names for API
             if (params.has("type")) {
                 const types = params.getAll("type");
                 params.delete("type");
@@ -130,40 +122,32 @@ export function DmsDocumentList({ folderId, search = "", onDocumentSelect, onLoa
             const response = await fetchWithAuth<{ data: DocumentData[], meta: any }>(`/api/secure/dms/documents?${queryString}`)
 
             setDocuments(response.data)
+
+            // Only update parent if total changed
+            if (onLoadCompleteRef.current) {
+                onLoadCompleteRef.current(response.meta.total)
+            }
+
             setMeta(response.meta)
-            onLoadComplete?.(response.meta.total)
         } catch (err: any) {
             setError(err.message || "Failed to load documents")
         } finally {
             setLoading(false)
         }
-    }, [folderId, search, searchParams, fetchWithAuth, onLoadComplete])
+    }, [folderId, search, searchParamsString, fetchWithAuth])
 
     useEffect(() => {
         loadDocuments()
     }, [loadDocuments])
 
     // Handlers
-    const handleSort = (key: string, direction: SortOrder) => {
-        updateUrl({
-            sortBy: direction ? key : null,
-            sortOrder: direction
-        })
-    }
+    const handlePageChange = useCallback((page: number) => {
+        updateUrl({ page: String(page) })
+    }, [updateUrl])
 
-    const handleFilter = (key: string, value: any) => {
-        // value can be array or string or null
-        if (Array.isArray(value)) {
-            updateUrl({ [key]: value.length ? value.join(",") : null })
-        } else {
-            updateUrl({ [key]: value })
-        }
-    }
-
-    const currentSort = {
-        key: searchParams.get("sortBy") || "createdAt",
-        direction: (searchParams.get("sortOrder") as SortOrder) || "desc"
-    }
+    const handleSearch = useCallback((term: string) => {
+        updateUrl({ search: term })
+    }, [updateUrl])
 
     // Advanced Filter State
     const [isAdvancedFilterOpen, setIsAdvancedFilterOpen] = useState(false)
@@ -173,38 +157,46 @@ export function DmsDocumentList({ folderId, search = "", onDocumentSelect, onLoa
         return ['status', 'type', 'expiryFilter', 'versionFrom', 'versionTo', 'includeSubfolders'].includes(key) && val
     }).length
 
-    return (
-        <div className="flex flex-col h-full bg-background flex-1 overflow-hidden">
-            {/* Toolbar / Active Filters */}
-            <div className="p-4 border-b flex items-center justify-between gap-4 bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60">
-                <div className="flex items-center gap-2 flex-1">
-                    {/* Search Bar could be here or above, assuming separate component or passed prop */}
-                    {/* For now, just show active filter summary or nothing if handled by layout */}
+    const advancedFilterButton = (
+        <div className="flex items-center gap-2">
+            <TooltipProvider>
+                <Tooltip>
+                    <TooltipTrigger asChild>
+                        <button
+                            onClick={() => setIsAdvancedFilterOpen(true)}
+                            className={`flex items-center justify-center p-2 rounded-md border transition-colors ${activeFilterCount > 0 ? "bg-primary/10 border-primary/20 text-primary" : "hover:bg-muted"}`}
+                            aria-label="Advanced Filters"
+                        >
+                            <Filter size={18} />
+                        </button>
+                    </TooltipTrigger>
+                    <TooltipContent>
+                        <p>Advanced Filters</p>
+                    </TooltipContent>
+                </Tooltip>
 
-                    {activeFilterCount > 0 && (
-                        <div className="flex items-center gap-2">
-                            <span className="text-xs font-medium text-muted-foreground">{activeFilterCount} active filters</span>
+                {showCreateButton && onCreateClick && (
+                    <Tooltip>
+                        <TooltipTrigger asChild>
                             <button
-                                onClick={() => router.push(pathname)}
-                                className="text-xs text-primary hover:underline"
+                                onClick={onCreateClick}
+                                className="inline-flex items-center justify-center p-2 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-all shadow-sm shrink-0"
+                                aria-label="New Document"
                             >
-                                Clear All
+                                <Plus size={18} />
                             </button>
-                        </div>
-                    )}
-                </div>
+                        </TooltipTrigger>
+                        <TooltipContent>
+                            <p>New Document</p>
+                        </TooltipContent>
+                    </Tooltip>
+                )}
+            </TooltipProvider>
+        </div>
+    )
 
-                <div className="flex items-center gap-2">
-                    <button
-                        onClick={() => setIsAdvancedFilterOpen(true)}
-                        className={`flex items-center gap-2 px-3 py-1.5 text-sm font-medium rounded-md border transition-colors ${activeFilterCount > 0 ? "bg-primary/10 border-primary/20 text-primary" : "hover:bg-muted"}`}
-                    >
-                        <Filter size={16} />
-                        Advanced Filters
-                    </button>
-                </div>
-            </div>
-
+    return (
+        <div className="flex flex-col min-h-full bg-background flex-1">
             <AdvancedFilterDrawer
                 isOpen={isAdvancedFilterOpen}
                 onClose={() => setIsAdvancedFilterOpen(false)}
@@ -212,191 +204,23 @@ export function DmsDocumentList({ folderId, search = "", onDocumentSelect, onLoa
             />
 
             {/* Content */}
-            <div className="flex-1 overflow-y-auto">
-                {!loading && documents.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center h-64 text-center p-8">
-                        <p className="text-sm text-muted-foreground italic">
-                            {searchParams.toString() ? "No documents match your filters." : "No documents found."}
-                        </p>
-                        {searchParams.toString() && (
-                            <button
-                                onClick={() => router.push(pathname)}
-                                className="mt-2 text-xs text-primary hover:underline"
-                            >
-                                Clear all filters
-                            </button>
-                        )}
+            <div className="flex-1 flex flex-col p-4">
+                {loading && documents.length === 0 ? (
+                    <div className="flex items-center justify-center flex-1">
+                        <Loader2 className="animate-spin text-primary" size={32} />
                     </div>
                 ) : (
-                    <table className="w-full text-left border-collapse">
-                        <thead className="sticky top-0 bg-background/95 backdrop-blur-sm shadow-sm z-10 border-b">
-                            <tr className="text-xs text-muted-foreground">
-                                <th className="px-4 py-3 w-32 align-top">
-                                    <DataTableHeader
-                                        title="Doc No." columnId="documentNumber"
-                                        sortable currentSortConfig={currentSort} onSort={handleSort}
-                                    />
-                                </th>
-                                <th className="px-4 py-3 align-top min-w-[200px]">
-                                    <DataTableHeader
-                                        title="Title" columnId="title"
-                                        sortable currentSortConfig={currentSort} onSort={handleSort}
-                                    />
-                                </th>
-                                <th className="px-4 py-3 w-32 align-top">
-                                    <DataTableHeader
-                                        title="Type" columnId="typeId" // Sort by relation? API handles 'type'
-                                        // Sort by type? API probably needs to join. Let's disable sort for now or implement.
-                                        // Filter
-                                        filterable filterType="multi-select"
-                                        filterOptions={documentTypes}
-                                        currentFilterValue={searchParams.get("type")?.split(",")}
-                                        onFilter={(v) => handleFilter("type", v)}
-                                    />
-                                </th>
-                                <th className="px-4 py-3 w-32 align-top">
-                                    <DataTableHeader
-                                        title="Status" columnId="status"
-                                        sortable currentSortConfig={currentSort} onSort={handleSort}
-                                        filterable filterType="multi-select"
-                                        filterOptions={[
-                                            { label: "Draft", value: "DRAFT" },
-                                            { label: "In Review", value: "SUBMITTED" },
-                                            { label: "Approved", value: "APPROVED" },
-                                            { label: "Rejected", value: "REJECTED" },
-                                            { label: "Obsolete", value: "OBSOLETE" },
-                                            // Expired is a calculated status, complicate to filter by strictly status DB field
-                                            // But effectively usually maps to OBSOLETE or just check expiry date
-                                        ]}
-                                        currentFilterValue={searchParams.get("status")?.split(",")}
-                                        onFilter={(v) => handleFilter("status", v)}
-                                    />
-                                </th>
-                                <th className="px-4 py-3 w-24 align-top">
-                                    <DataTableHeader
-                                        title="Version" columnId="version"
-                                        sortable currentSortConfig={currentSort} onSort={handleSort}
-                                    />
-                                </th>
-                                <th className="px-4 py-3 w-32 align-top">
-                                    <DataTableHeader
-                                        title="Expiry" columnId="expiryDate"
-                                        sortable currentSortConfig={currentSort} onSort={handleSort}
-                                        filterable filterType="select"
-                                        filterOptions={[
-                                            { label: "Expired", value: "expired" },
-                                            { label: "Expiring soon (30d)", value: "expiring_30" },
-                                            { label: "Expiring soon (90d)", value: "expiring_90" },
-                                        ]}
-                                        currentFilterValue={searchParams.get("expiryFilter")}
-                                        onFilter={(v) => handleFilter("expiryFilter", v)}
-                                    />
-                                </th>
-                                <th className="px-4 py-3 w-40 align-top">
-                                    <DataTableHeader
-                                        title="Modified" columnId="updatedAt"
-                                        sortable currentSortConfig={currentSort} onSort={handleSort}
-                                    />
-                                </th>
-                                <th className="px-4 py-3 w-12 text-right"></th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y relative">
-                            {loading && (
-                                <tr className="absolute inset-0 bg-background/50 z-20 flex items-center justify-center min-h-[100px]">
-                                    <td colSpan={8} className="h-full w-full flex items-center justify-center">
-                                        <Loader2 className="animate-spin text-primary" size={24} />
-                                    </td>
-                                </tr>
-                            )}
-                            {documents.map((doc) => (
-                                <tr
-                                    key={doc.id}
-                                    onClick={() => onDocumentSelect(doc.id)}
-                                    className="group hover:bg-muted/30 cursor-pointer transition-colors"
-                                >
-                                    <td className="px-4 py-3 text-sm font-mono text-muted-foreground">
-                                        {doc.documentNumber || '-'}
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-2 bg-primary/5 rounded border group-hover:bg-primary/10 transition-colors">
-                                                <FileText size={18} className="text-primary/70" />
-                                            </div>
-                                            <div className="flex flex-col min-w-0">
-                                                <span className="text-sm font-medium truncate">{doc.title}</span>
-                                                {doc.description && (
-                                                    <span className="text-[11px] text-muted-foreground truncate max-w-md">
-                                                        {doc.description}
-                                                    </span>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td className="px-4 py-3 text-sm">
-                                        {doc.type?.name ? (
-                                            <span className="inline-flex items-center px-2 py-1 rounded-md bg-secondary text-secondary-foreground text-xs font-medium">
-                                                {doc.type.name}
-                                            </span>
-                                        ) : (
-                                            <span className="text-muted-foreground text-xs">-</span>
-                                        )}
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <StatusBadge status={doc.effectiveStatus} />
-                                    </td>
-                                    <td className="px-4 py-3">
-                                        <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                                            <History size={12} />
-                                            v{doc.currentVersion?.versionNumber || 0}
-                                        </div>
-                                    </td>
-                                    <td className="px-4 py-3 text-xs text-muted-foreground">
-                                        {doc.expiryDate ? new Date(doc.expiryDate).toLocaleDateString() : '-'}
-                                    </td>
-                                    <td className="px-4 py-3 text-xs text-muted-foreground">
-                                        {new Date(doc.updatedAt).toLocaleDateString()}
-                                    </td>
-                                    <td className="px-4 py-3 text-right">
-                                        <button
-                                            onClick={(e) => {
-                                                e.stopPropagation()
-                                                // Dropdown logic would go here
-                                            }}
-                                            className="p-1 rounded-md hover:bg-muted-foreground/10 transition-colors opacity-0 group-hover:opacity-100"
-                                        >
-                                            <MoreVertical size={16} />
-                                        </button>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                    <DataTable
+                        columns={columns}
+                        data={documents}
+                        meta={meta}
+                        onRowClick={(doc) => onDocumentSelect(doc.id)}
+                        onPageChange={handlePageChange}
+                        onSearch={handleSearch}
+                        initialSearch={search}
+                        toolbarActions={advancedFilterButton}
+                    />
                 )}
-            </div>
-
-            {/* Pagination Footer */}
-            <div className="border-t p-2 bg-muted/20 flex items-center justify-between text-xs text-muted-foreground">
-                <div className="flex items-center gap-2">
-                    <span>Page {meta.page} of {meta.totalPages}</span>
-                    <span className="hidden sm:inline">({meta.total} items)</span>
-                </div>
-                <div className="flex items-center gap-1">
-                    <button
-                        onClick={() => updateUrl({ page: String(meta.page - 1) })}
-                        disabled={meta.page <= 1}
-                        className="p-1 rounded hover:bg-muted disabled:opacity-50"
-                    >
-                        <ChevronLeft size={16} />
-                    </button>
-                    <button
-                        onClick={() => updateUrl({ page: String(meta.page + 1) })}
-                        disabled={meta.page >= meta.totalPages}
-                        className="p-1 rounded hover:bg-muted disabled:opacity-50"
-                    >
-                        <ChevronRight size={16} />
-                    </button>
-                </div>
             </div>
 
             {/* Error Overlay */}

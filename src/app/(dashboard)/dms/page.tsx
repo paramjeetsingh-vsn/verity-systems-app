@@ -3,7 +3,7 @@
 import React, { useState } from "react"
 import { useRouter } from "next/navigation"
 import {
-    Plus,
+
     PanelLeft,
     Menu,
     X,
@@ -29,13 +29,17 @@ export default function DmsDashboard() {
     // Permissions
     const canCreateDocument = usePermission("DMS_DOCUMENT_CREATE")
 
-    const handleDocumentSelect = (docId: string) => {
+    const handleDocumentSelect = React.useCallback((docId: string) => {
         router.push(`/dms/documents/${docId}`)
-    }
+    }, [router])
 
-    const handleCreateSuccess = (docId: string) => {
+    const handleCreateSuccess = React.useCallback((docId: string) => {
         router.push(`/dms/documents/${docId}`)
-    }
+    }, [router])
+
+    const handleCreateClick = React.useCallback(() => {
+        setIsCreateModalOpen(true)
+    }, [])
 
     return (
         <div className="flex flex-col h-[calc(100vh-140px)] -m-4 sm:-m-6">
@@ -61,15 +65,7 @@ export default function DmsDashboard() {
 
                 <div className="flex items-center gap-3 w-full sm:w-auto">
                     <DmsSearchBar onSearch={setSearchQuery} />
-                    {canCreateDocument && (
-                        <button
-                            onClick={() => setIsCreateModalOpen(true)}
-                            className="inline-flex items-center gap-2 px-4 py-2 bg-primary text-primary-foreground rounded-md text-sm font-medium hover:bg-primary/90 transition-all shadow-sm shrink-0"
-                        >
-                            <Plus size={18} />
-                            <span className="hidden sm:inline">New Document</span>
-                        </button>
-                    )}
+
                 </div>
             </div>
 
@@ -92,12 +88,14 @@ export default function DmsDashboard() {
                 </div>
 
                 {/* Main List Area */}
-                <div className="flex-1 overflow-hidden flex flex-col bg-muted/20">
+                <div className="flex-1 overflow-y-auto flex flex-col bg-muted/20">
                     <DmsDocumentList
                         folderId={selectedFolderId}
                         search={searchQuery}
                         onDocumentSelect={handleDocumentSelect}
                         onLoadComplete={setItemCount}
+                        onCreateClick={handleCreateClick}
+                        showCreateButton={canCreateDocument}
                     />
                 </div>
 
