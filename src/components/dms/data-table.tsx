@@ -9,10 +9,8 @@ import {
     flexRender,
     getCoreRowModel,
     getFilteredRowModel,
-    getPaginationRowModel,
     getSortedRowModel,
     useReactTable,
-    Table as TanStackTable,
 } from "@tanstack/react-table"
 
 import {
@@ -24,14 +22,6 @@ import {
     TableRow,
 } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import {
-    DropdownMenu,
-    DropdownMenuCheckboxItem,
-    DropdownMenuContent,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { ChevronDown, Columns } from "lucide-react"
 
 interface DataTableProps<TData, TValue> {
     columns: ColumnDef<TData, TValue>[]
@@ -44,9 +34,8 @@ interface DataTableProps<TData, TValue> {
         totalPages: number
     }
     onPageChange?: (page: number) => void
-    onSearch?: (term: string) => void
-    initialSearch?: string
-    toolbarActions?: React.ReactNode
+    columnVisibility?: VisibilityState
+    onColumnVisibilityChange?: (vis: VisibilityState) => void
 }
 
 export function DataTable<TData, TValue>({
@@ -55,117 +44,59 @@ export function DataTable<TData, TValue>({
     onRowClick,
     meta,
     onPageChange,
-    onSearch,
-    initialSearch = "",
-    toolbarActions
+    columnVisibility: externalColumnVisibility,
+    onColumnVisibilityChange,
 }: DataTableProps<TData, TValue>) {
     const [sorting, setSorting] = React.useState<SortingState>([])
-    const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
-        []
-    )
-    const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({})
+    const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([])
+    const [internalColumnVisibility, setInternalColumnVisibility] = React.useState<VisibilityState>({})
     const [rowSelection, setRowSelection] = React.useState({})
-    const [globalFilter, setGlobalFilter] = React.useState(initialSearch)
+
+    const columnVisibility = externalColumnVisibility ?? internalColumnVisibility
+    const handleColumnVisibilityChange = React.useCallback((updater: any) => {
+        const newValue = typeof updater === 'function' ? updater(columnVisibility) : updater
+        if (onColumnVisibilityChange) {
+            onColumnVisibilityChange(newValue)
+        } else {
+            setInternalColumnVisibility(newValue)
+        }
+    }, [columnVisibility, onColumnVisibilityChange])
 
     const table = useReactTable({
         data,
         columns,
         getCoreRowModel: getCoreRowModel(),
-        // Client-side pagination if meta is not provided, but we want server-side usually
-        // For now let's just use manual pagination controls if meta is present
-        // getPaginationRowModel: getPaginationRowModel(),
         onSortingChange: setSorting,
         getSortedRowModel: getSortedRowModel(),
         onColumnFiltersChange: setColumnFilters,
         getFilteredRowModel: getFilteredRowModel(),
-        onColumnVisibilityChange: setColumnVisibility,
+        onColumnVisibilityChange: handleColumnVisibilityChange,
         onRowSelectionChange: setRowSelection,
         state: {
             sorting,
             columnFilters,
             columnVisibility,
             rowSelection,
-            globalFilter,
         },
-        // We will likely override sorting with server-side props later if needed, 
-        // but for now let's enable client sorting for the *current page* 
-        // or passing sorting state back up. 
-        // The implementation plan said "Decision: Keep Server Sort". 
-        // So we might need to hoist state. 
-        // However, the previous implementation had URL-based state. 
-        // Let's get the table rendering first.
     })
-
-    // Debounce search
-    React.useEffect(() => {
-        const timeout = setTimeout(() => {
-            onSearch?.(globalFilter)
-        }, 500)
-        return () => clearTimeout(timeout)
-    }, [globalFilter, onSearch])
-
-    // Update global filter if prop changes (e.g. from URL)
-    React.useEffect(() => {
-        if (initialSearch !== globalFilter) {
-            setGlobalFilter(initialSearch)
-        }
-    }, [initialSearch])
 
     return (
         <div className="flex flex-col min-h-full bg-background flex-1">
-            <div className="flex items-center py-4 gap-2">
-                <Input
-                    placeholder="Filter..."
-                    value={globalFilter ?? ""}
-                    onChange={(event) => setGlobalFilter(event.target.value)}
-                    className="max-w-sm"
-                />
-                <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                        <Button variant="outline" className="ml-auto">
-                            <Columns className="mr-2 h-4 w-4" />
-                            Columns <ChevronDown className="ml-2 h-4 w-4" />
-                        </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                        {table
-                            .getAllColumns()
-                            .filter((column) => column.getCanHide())
-                            .map((column) => {
-                                return (
-                                    <DropdownMenuCheckboxItem
-                                        key={column.id}
-                                        className="capitalize"
-                                        checked={column.getIsVisible()}
-                                        onCheckedChange={(value) =>
-                                            column.toggleVisibility(!!value)
-                                        }
-                                    >
-                                        {column.id}
-                                    </DropdownMenuCheckboxItem>
-                                )
-                            })}
-                    </DropdownMenuContent>
-                </DropdownMenu>
-                {toolbarActions}
-            </div>
             <div className="rounded-md border flex-1">
                 <Table>
                     <TableHeader className="sticky top-0 bg-background z-10">
                         {table.getHeaderGroups().map((headerGroup) => (
                             <TableRow key={headerGroup.id}>
-                                {headerGroup.headers.map((header) => {
-                                    return (
-                                        <TableHead key={header.id}>
-                                            {header.isPlaceholder
-                                                ? null
-                                                : flexRender(
-                                                    header.column.columnDef.header,
-                                                    header.getContext()
-                                                )}
-                                        </TableHead>
-                                    )
-                                })}
+                                {headerGroup.headers.map((header) => (
+                                    <TableHead key={header.id}>
+                                        {header.isPlaceholder
+                                            ? null
+                                            : flexRender(
+                                                header.column.columnDef.header,
+                                                header.getContext()
+                                            )}
+                                    </TableHead>
+                                ))}
                             </TableRow>
                         ))}
                     </TableHeader>
@@ -176,7 +107,7 @@ export function DataTable<TData, TValue>({
                                     key={row.id}
                                     data-state={row.getIsSelected() && "selected"}
                                     onClick={() => onRowClick?.(row.original)}
-                                    className="cursor-pointer"
+                                    className="cursor-pointer hover:bg-muted/50"
                                 >
                                     {row.getVisibleCells().map((cell) => (
                                         <TableCell key={cell.id}>
@@ -192,7 +123,7 @@ export function DataTable<TData, TValue>({
                             <TableRow>
                                 <TableCell
                                     colSpan={columns.length}
-                                    className="h-24 text-center"
+                                    className="h-24 text-center text-muted-foreground"
                                 >
                                     No results.
                                 </TableCell>
@@ -201,13 +132,12 @@ export function DataTable<TData, TValue>({
                     </TableBody>
                 </Table>
             </div>
-            {/* Pagination Controls - similar to previous but using Shadcn Button */}
             {meta && (
-                <div className="flex items-center justify-end space-x-2 py-4 border-t">
-                    <div className="flex-1 text-sm text-muted-foreground">
-                        Page {meta.page} of {meta.totalPages} ({meta.total} rows)
-                    </div>
-                    <div className="space-x-2">
+                <div className="flex items-center justify-between py-3 border-t mt-auto">
+                    <p className="text-sm text-muted-foreground">
+                        Page {meta.page} of {meta.totalPages} &middot; {meta.total} total
+                    </p>
+                    <div className="flex gap-2">
                         <Button
                             variant="outline"
                             size="sm"
