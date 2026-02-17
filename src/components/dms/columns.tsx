@@ -2,6 +2,7 @@
 
 import { ColumnDef } from "@tanstack/react-table"
 import { ArrowUpDown, MoreVertical, FileText, History } from "lucide-react"
+import { formatRelativeDate } from "@/lib/utils/format-date"
 import { StatusBadge } from "@/components/dms/StatusBadge"
 import { Button } from "@/components/ui/button"
 import {
@@ -161,7 +162,14 @@ export const columns: ColumnDef<DocumentData>[] = [
         },
         cell: ({ row }) => {
             const date = row.original.expiryDate
-            return date ? <span className="text-xs text-muted-foreground">{new Date(date).toLocaleDateString()}</span> : <span className="text-xs text-muted-foreground">-</span>
+            if (!date) return <span className="text-xs text-muted-foreground">-</span>
+            const d = new Date(date)
+            const isExpired = d.getTime() < Date.now()
+            return (
+                <span className={`text-xs ${isExpired ? "text-destructive font-medium" : "text-muted-foreground"}`} title={d.toLocaleString()}>
+                    {formatRelativeDate(date)}
+                </span>
+            )
         },
     },
     {
@@ -179,7 +187,7 @@ export const columns: ColumnDef<DocumentData>[] = [
         },
         cell: ({ row }) => {
             const date = row.original.updatedAt
-            return <span className="text-xs text-muted-foreground">{new Date(date).toLocaleDateString()}</span>
+            return <span className="text-xs text-muted-foreground" title={new Date(date).toLocaleString()}>{formatRelativeDate(date)}</span>
         },
     },
     {

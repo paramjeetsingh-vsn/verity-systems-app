@@ -22,6 +22,14 @@ import {
     TableRow,
 } from "@/components/ui/table"
 import { Button } from "@/components/ui/button"
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select"
+import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react"
 
 interface DataTableProps<TData, TValue> {
     columns: ColumnDef<TData, TValue>[]
@@ -34,6 +42,7 @@ interface DataTableProps<TData, TValue> {
         totalPages: number
     }
     onPageChange?: (page: number) => void
+    onPageSizeChange?: (size: number) => void
     columnVisibility?: VisibilityState
     onColumnVisibilityChange?: (vis: VisibilityState) => void
 }
@@ -44,6 +53,7 @@ export function DataTable<TData, TValue>({
     onRowClick,
     meta,
     onPageChange,
+    onPageSizeChange,
     columnVisibility: externalColumnVisibility,
     onColumnVisibilityChange,
 }: DataTableProps<TData, TValue>) {
@@ -79,6 +89,26 @@ export function DataTable<TData, TValue>({
             rowSelection,
         },
     })
+
+    const getPageNumbers = () => {
+        if (!meta) return []
+        const { page, totalPages } = meta
+        const pages: (number | "...")[] = []
+
+        if (totalPages <= 7) {
+            for (let i = 1; i <= totalPages; i++) pages.push(i)
+        } else {
+            pages.push(1)
+            if (page > 3) pages.push("...")
+            const start = Math.max(2, page - 1)
+            const end = Math.min(totalPages - 1, page + 1)
+            for (let i = start; i <= end; i++) pages.push(i)
+            if (page < totalPages - 2) pages.push("...")
+            pages.push(totalPages)
+        }
+
+        return pages
+    }
 
     return (
         <div className="flex flex-col min-h-full bg-background flex-1">
@@ -132,29 +162,87 @@ export function DataTable<TData, TValue>({
                     </TableBody>
                 </Table>
             </div>
-            {meta && (
+            {meta && meta.totalPages > 0 && (
                 <div className="flex items-center justify-between py-3 border-t mt-auto">
-                    <p className="text-sm text-muted-foreground">
-                        Page {meta.page} of {meta.totalPages} &middot; {meta.total} total
-                    </p>
-                    <div className="flex gap-2">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => onPageChange?.(meta.page - 1)}
-                            disabled={!onPageChange || meta.page <= 1}
-                        >
-                            Previous
-                        </Button>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => onPageChange?.(meta.page + 1)}
-                            disabled={!onPageChange || meta.page >= meta.totalPages}
-                        >
-                            Next
-                        </Button>
+                    <div className="flex items-center gap-3">
+                        <p className="text-sm text-muted-foreground whitespace-nowrap">
+                            {meta.total} document{meta.total !== 1 ? "s" : ""}
+                        </p>
+                        {onPageSizeChange && (
+                            <div className="flex items-center gap-1.5">
+                                <span className="text-xs text-muted-foreground whitespace-nowrap">Rows:</span>
+                                <Select
+                                    value={String(meta.limit)}
+                                    onValueChange={(val) => onPageSizeChange(Number(val))}
+                                >
+                                    <SelectTrigger className="h-7 w-[62px] text-xs">
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="20">20</SelectItem>
+                                        <SelectItem value="50">50</SelectItem>
+                                        <SelectItem value="100">100</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
                     </div>
+                    {meta.totalPages > 1 && (
+                        <div className="flex items-center gap-1">
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => onPageChange?.(1)}
+                                disabled={!onPageChange || meta.page <= 1}
+                            >
+                                <ChevronsLeft size={14} />
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => onPageChange?.(meta.page - 1)}
+                                disabled={!onPageChange || meta.page <= 1}
+                            >
+                                <ChevronLeft size={14} />
+                            </Button>
+                            {getPageNumbers().map((p, i) =>
+                                p === "..." ? (
+                                    <span key={`ellipsis-${i}`} className="px-1 text-xs text-muted-foreground">...</span>
+                                ) : (
+                                    <Button
+                                        key={p}
+                                        variant={meta.page === p ? "default" : "outline"}
+                                        size="icon"
+                                        className="h-7 w-7 text-xs"
+                                        onClick={() => onPageChange?.(p as number)}
+                                        disabled={!onPageChange}
+                                    >
+                                        {p}
+                                    </Button>
+                                )
+                            )}
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => onPageChange?.(meta.page + 1)}
+                                disabled={!onPageChange || meta.page >= meta.totalPages}
+                            >
+                                <ChevronRight size={14} />
+                            </Button>
+                            <Button
+                                variant="outline"
+                                size="icon"
+                                className="h-7 w-7"
+                                onClick={() => onPageChange?.(meta.totalPages)}
+                                disabled={!onPageChange || meta.page >= meta.totalPages}
+                            >
+                                <ChevronsRight size={14} />
+                            </Button>
+                        </div>
+                    )}
                 </div>
             )}
         </div>

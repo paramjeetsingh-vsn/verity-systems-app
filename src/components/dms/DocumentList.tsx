@@ -2,18 +2,18 @@
 
 import React, { useEffect, useState, useCallback, useRef } from "react"
 import { useRouter, useSearchParams, usePathname } from "next/navigation"
-import {
-    AlertCircle,
-    Loader2,
-} from "lucide-react"
+import { AlertCircle } from "lucide-react"
 import { useAuth } from "@/lib/auth/auth-context"
 import { DataTable } from "@/components/dms/data-table"
 import { columns, DocumentData } from "@/components/dms/columns"
 import { AdvancedFilterDrawer } from "@/components/dms/AdvancedFilterDrawer"
+import { TableSkeleton } from "@/components/dms/TableSkeleton"
+import { EmptyState } from "@/components/dms/EmptyState"
 import { VisibilityState } from "@tanstack/react-table"
 
 interface DocumentListProps {
     folderId: string | null
+    folderName?: string | null
     search?: string
     onDocumentSelect: (docId: string) => void
     onLoadComplete?: (count: number) => void
@@ -22,10 +22,13 @@ interface DocumentListProps {
     onActiveFilterCountChange?: (count: number) => void
     columnVisibility?: VisibilityState
     onColumnVisibilityChange?: (vis: VisibilityState) => void
+    canCreate?: boolean
+    onCreateClick?: () => void
 }
 
 export function DmsDocumentList({
     folderId,
+    folderName,
     search = "",
     onDocumentSelect,
     onLoadComplete,
@@ -34,6 +37,8 @@ export function DmsDocumentList({
     onActiveFilterCountChange,
     columnVisibility,
     onColumnVisibilityChange,
+    canCreate,
+    onCreateClick,
 }: DocumentListProps) {
     const { fetchWithAuth } = useAuth()
     const router = useRouter()
@@ -41,7 +46,8 @@ export function DmsDocumentList({
     const searchParams = useSearchParams()
 
     const [documents, setDocuments] = useState<DocumentData[]>([])
-    const [loading, setLoading] = useState(false)
+    const [loading, setLoading] = useState(true)
+    const [initialLoad, setInitialLoad] = useState(true)
     const [error, setError] = useState<string | null>(null)
     const [meta, setMeta] = useState({ page: 1, limit: 50, total: 0, totalPages: 1 })
     const [documentTypes, setDocumentTypes] = useState<{ label: string, value: string }[]>([])
@@ -113,6 +119,7 @@ export function DmsDocumentList({
             setError(err.message || "Failed to load documents")
         } finally {
             setLoading(false)
+            setInitialLoad(false)
         }
     }, [folderId, search, searchParamsString, fetchWithAuth])
 
@@ -124,6 +131,10 @@ export function DmsDocumentList({
         updateUrl({ page: String(page) })
     }, [updateUrl])
 
+    const handlePageSizeChange = useCallback((size: number) => {
+        updateUrl({ limit: String(size), page: "1" })
+    }, [updateUrl])
+
     const activeFilterCount = Array.from(searchParams.entries()).filter(([key, val]) => {
         return ['status', 'type', 'expiryFilter', 'versionFrom', 'versionTo', 'includeSubfolders'].includes(key) && val
     }).length
@@ -131,6 +142,9 @@ export function DmsDocumentList({
     useEffect(() => {
         onActiveFilterCountChange?.(activeFilterCount)
     }, [activeFilterCount, onActiveFilterCountChange])
+
+    const hasFiltersOrSearch = !!search || activeFilterCount > 0
+    const isEmpty = !loading && documents.length === 0 && meta.total === 0
 
     return (
         <div className="flex flex-col min-h-full bg-background flex-1">
@@ -141,10 +155,16 @@ export function DmsDocumentList({
             />
 
             <div className="flex-1 flex flex-col p-4">
-                {loading && documents.length === 0 ? (
-                    <div className="flex items-center justify-center flex-1">
-                        <Loader2 className="animate-spin text-primary" size={32} />
-                    </div>
+                {initialLoad ? (
+                    <TableSkeleton rows={8} columns={7} />
+                ) : isEmpty ? (
+                    <EmptyState
+                        hasSearch={hasFiltersOrSearch}
+                        hasFolder={!!folderId}
+                        folderName={folderName}
+                        canCreate={canCreate}
+                        onCreateClick={onCreateClick}
+                    />
                 ) : (
                     <DataTable
                         columns={columns}
@@ -152,6 +172,7 @@ export function DmsDocumentList({
                         meta={meta}
                         onRowClick={(doc) => onDocumentSelect(doc.id)}
                         onPageChange={handlePageChange}
+                        onPageSizeChange={handlePageSizeChange}
                         columnVisibility={columnVisibility}
                         onColumnVisibilityChange={onColumnVisibilityChange}
                     />

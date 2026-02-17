@@ -11,6 +11,7 @@ import {
     Plus,
     Columns,
     ChevronDown,
+    ChevronRight,
 } from "lucide-react"
 import { FolderTree } from "@/components/dms/FolderTree"
 import { DmsDocumentList } from "@/components/dms/DocumentList"
@@ -48,6 +49,7 @@ export default function DmsDashboard() {
     const router = useRouter()
 
     const [selectedFolderId, setSelectedFolderId] = useState<string | null>(null)
+    const [selectedFolderName, setSelectedFolderName] = useState<string | null>(null)
     const [searchQuery, setSearchQuery] = useState("")
     const [searchInput, setSearchInput] = useState("")
     const [isSidebarOpen, setIsSidebarOpen] = useState(true)
@@ -80,6 +82,14 @@ export default function DmsDashboard() {
     const handleCreateSuccess = useCallback((docId: string) => {
         router.push(`/dms/documents/${docId}`)
     }, [router])
+
+    const handleFolderSelect = useCallback((folderId: string | null, folderName?: string | null) => {
+        setSelectedFolderId(folderId)
+        setSelectedFolderName(folderName ?? null)
+        if (typeof window !== "undefined" && window.innerWidth < 1024) {
+            setIsSidebarOpen(false)
+        }
+    }, [])
 
     useEffect(() => {
         const timer = setTimeout(() => {
@@ -114,9 +124,19 @@ export default function DmsDashboard() {
                         </button>
                         <div className="flex items-center gap-2 min-w-0">
                             <FolderOpen className="text-primary shrink-0 hidden sm:block" size={22} />
-                            <h1 className="text-lg font-semibold text-foreground leading-tight truncate">
-                                Document Management
-                            </h1>
+                            <div className="flex items-center gap-1.5 min-w-0">
+                                <h1 className="text-lg font-semibold text-foreground leading-tight whitespace-nowrap">
+                                    Documents
+                                </h1>
+                                {selectedFolderName && (
+                                    <>
+                                        <ChevronRight size={14} className="text-muted-foreground shrink-0" />
+                                        <span className="text-lg font-medium text-muted-foreground leading-tight truncate max-w-[200px]" title={selectedFolderName}>
+                                            {selectedFolderName}
+                                        </span>
+                                    </>
+                                )}
+                            </div>
                         </div>
                     </div>
 
@@ -233,16 +253,14 @@ export default function DmsDashboard() {
                 `}>
                     <FolderTree
                         selectedFolderId={selectedFolderId}
-                        onFolderSelect={(id) => {
-                            setSelectedFolderId(id)
-                            if (window.innerWidth < 1024) setIsSidebarOpen(false)
-                        }}
+                        onFolderSelect={handleFolderSelect}
                     />
                 </div>
 
                 <div className="flex-1 overflow-y-auto flex flex-col bg-muted/20">
                     <DmsDocumentList
                         folderId={selectedFolderId}
+                        folderName={selectedFolderName}
                         search={searchQuery}
                         onDocumentSelect={handleDocumentSelect}
                         onLoadComplete={setItemCount}
@@ -251,6 +269,8 @@ export default function DmsDashboard() {
                         onActiveFilterCountChange={setActiveFilterCount}
                         columnVisibility={columnVisibility}
                         onColumnVisibilityChange={setColumnVisibility}
+                        canCreate={canCreateDocument}
+                        onCreateClick={() => setIsCreateModalOpen(true)}
                     />
                 </div>
 

@@ -22,7 +22,7 @@ interface FolderData {
 }
 
 interface FolderTreeProps {
-    onFolderSelect: (folderId: string | null) => void
+    onFolderSelect: (folderId: string | null, folderName?: string | null) => void
     selectedFolderId: string | null
 }
 
@@ -154,7 +154,7 @@ export function FolderTree({ onFolderSelect, selectedFolderId }: FolderTreeProps
         return (
             <div className="flex flex-col">
                 <div
-                    onClick={() => onFolderSelect(folder.id)}
+                    onClick={() => onFolderSelect(folder.id, folder.name)}
                     className={`
                         group flex items-center justify-between py-1.5 px-2 rounded-md cursor-pointer transition-colors
                         ${isSelected ? "bg-primary/10 text-primary font-medium" : "hover:bg-muted text-foreground"}
